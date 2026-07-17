@@ -33,7 +33,7 @@ export async function updateParticipants(participants: string[]) {
 export async function updateOrganizerConfig(
   organizerMode: OrganizerMode,
   organizers: string[],
-  selectedOrganizerIndex: number,
+  selectedOrganizerIndices: number[],
 ) {
   const res = await fetch(`${BASE_URL}/organizer_config`, {
     method: "POST",
@@ -41,7 +41,7 @@ export async function updateOrganizerConfig(
     body: JSON.stringify({
       organizer_mode: organizerMode,
       organizers,
-      selected_organizer_index: selectedOrganizerIndex,
+      selected_organizer_indices: selectedOrganizerIndices,
     }),
   });
   await ensureOk(res);
@@ -75,6 +75,15 @@ export async function draw(mode: DrawMode) {
 
   const data = await res.json();
   return data.result;
+}
+
+export async function updateDrawSettings(missThreshold: number, enableAutoForce: boolean) {
+  const res = await fetch(`${BASE_URL}/draw_settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ miss_threshold: missThreshold, enable_auto_force: enableAutoForce }),
+  });
+  await ensureOk(res);
 }
 
 export async function notifyPresentationComplete(roundId: string) {

@@ -3,25 +3,20 @@ import { RouletteResult, RouletteResultTeam } from "../types";
 export function getActiveOrganizers(
   organizerMode: "single" | "double",
   organizers: string[],
-  selectedOrganizerIndex = 0,
+  selectedOrganizerIndices: number[] = [0],
 ): string[] {
-  if (organizerMode === "double") {
-    return organizers.slice(0, 2);
-  }
-
-  if (organizers.length === 0) {
-    return [];
-  }
-
-  const index = selectedOrganizerIndex === 1 && organizers[1] ? 1 : 0;
-  return organizers[index] ? [organizers[index]] : [];
+  const limit = organizerMode === "double" ? 2 : 1;
+  return selectedOrganizerIndices
+    .filter((i) => i >= 0 && i < organizers.length)
+    .slice(0, limit)
+    .map((i) => organizers[i]);
 }
 
 export function getDisplayTeams(
   result: RouletteResult | null,
   organizers: string[] = [],
   organizerMode: "single" | "double" = "single",
-  selectedOrganizerIndex = 0,
+  selectedOrganizerIndices: number[] = [0],
 ): RouletteResultTeam[] {
   if (!result) {
     return [];
@@ -30,7 +25,7 @@ export function getDisplayTeams(
   const activeOrganizers = getActiveOrganizers(
     organizerMode,
     organizers,
-    selectedOrganizerIndex,
+    selectedOrganizerIndices,
   );
 
   if (

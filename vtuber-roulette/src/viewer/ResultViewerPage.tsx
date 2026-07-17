@@ -91,7 +91,7 @@ export const ResultViewerPage = () => {
     serverState.result,
     serverState.organizers,
     serverState.organizer_mode,
-    serverState.selected_organizer_index,
+    serverState.selected_organizer_indices,
   );
 
   return (

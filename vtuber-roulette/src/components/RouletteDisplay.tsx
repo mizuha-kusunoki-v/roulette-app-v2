@@ -5,12 +5,12 @@ export const RouletteDisplay = ({
   result,
   organizers = [],
   organizerMode = "single",
-  selectedOrganizerIndex = 0,
+  selectedOrganizerIndices = [0],
 }: {
   result: RouletteResult | null;
   organizers?: string[];
   organizerMode?: OrganizerMode;
-  selectedOrganizerIndex?: number;
+  selectedOrganizerIndices?: number[];
 }) => {
   if (!result) return <p>抽選結果はまだありません。</p>;
 
@@ -18,7 +18,7 @@ export const RouletteDisplay = ({
     result,
     organizers,
     organizerMode,
-    selectedOrganizerIndex,
+    selectedOrganizerIndices,
   );
 
   return (

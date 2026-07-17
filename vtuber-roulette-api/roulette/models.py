@@ -20,8 +20,10 @@ class RouletteState(BaseModel):
     participants: List[str] = []
     organizer_mode: OrganizerMode = "single"
     organizers: List[str] = []
-    selected_organizer_index: int = 0
+    selected_organizer_indices: List[int] = [0]
     forced_players: List[str] = []
+    miss_threshold: int = 3
+    enable_auto_force: bool = False
     auto_forced_players: List[str] = []
     excluded_players: List[str] = []
     participation_counts: Dict[str, int] = {}
@@ -44,7 +46,7 @@ class ParticipantsRequest(BaseModel):
 class OrganizerConfigRequest(BaseModel):
     organizer_mode: OrganizerMode
     organizers: List[str]
-    selected_organizer_index: int = 0
+    selected_organizer_indices: List[int] = [0]
 
 
 class ForcedPlayersRequest(BaseModel):
@@ -61,3 +63,8 @@ class DrawRequest(BaseModel):
 
 class PresentationCompleteRequest(BaseModel):
     round_id: str
+
+
+class DrawSettingsRequest(BaseModel):
+    miss_threshold: int
+    enable_auto_force: bool

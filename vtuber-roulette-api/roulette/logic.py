@@ -8,7 +8,6 @@ from fastapi import HTTPException
 from draw_config import (
     AUTO_FORCE_MAX_PER_DRAW,
     AUTO_FORCE_MEDIAN_GAP,
-    ENABLE_AUTO_FORCE_BY_MEDIAN_GAP,
 )
 from .models import DrawMode, ResultTeam, RouletteResult, RouletteState
 
@@ -36,16 +35,13 @@ def sanitize_names(names: List[str], limit: int) -> List[str]:
 
 
 def active_organizers() -> List[str]:
-    if state.organizer_mode == "double":
-        return state.organizers[:2]
-
-    if not state.organizers:
-        return []
-
-    index = state.selected_organizer_index
-    if index < 0 or index >= len(state.organizers):
-        index = 0
-    return [state.organizers[index]]
+    result = [
+        state.organizers[i]
+        for i in state.selected_organizer_indices
+        if 0 <= i < len(state.organizers)
+    ]
+    limit = 2 if state.organizer_mode == "double" else 1
+    return result[:limit]
 
 
 def organizer_set() -> set[str]:
@@ -58,7 +54,7 @@ def compute_auto_forced_players(
     manual_forced: List[str],
     excluded_players: List[str] | None = None,
 ) -> List[str]:
-    if not ENABLE_AUTO_FORCE_BY_MEDIAN_GAP or not state.participants:
+    if not state.enable_auto_force or not state.participants:
         return []
 
     excluded_set = set(excluded_players or [])
@@ -81,7 +77,7 @@ def compute_auto_forced_players(
         and p not in manual_forced
         and p not in state.last_players
         and p not in excluded_set
-        and state.miss_counts.get(p, 0) < 3
+        and state.miss_counts.get(p, 0) < state.miss_threshold
         and state.participation_counts.get(p, 0) <= threshold
     ]
     auto_forced.sort(key=lambda p: (state.participation_counts.get(p, 0), p))
@@ -123,7 +119,7 @@ def select_players(count: int):
 
     manual_forced = [
         p for p in state.forced_players if p in state.participants and p not in organizers
-    ][:2]
+    ][:4]
     selected = append_with_reason(manual_forced, "manual_check", count)
 
     available = [
@@ -135,7 +131,7 @@ def select_players(count: int):
         and p not in state.excluded_players
     ]
 
-    guaranteed = [p for p in available if state.miss_counts.get(p, 0) >= 3]
+    guaranteed = [p for p in available if state.miss_counts.get(p, 0) >= state.miss_threshold]
     selected += append_with_reason(guaranteed, "miss_3", count - len(selected))
 
     auto_forced = compute_auto_forced_players(manual_forced, selected)
