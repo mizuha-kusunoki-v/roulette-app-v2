@@ -20,7 +20,7 @@ export type RouletteState = {
   participants: string[];
   organizer_mode: OrganizerMode;
   organizers: string[];
-  selected_organizer_index: number;
+  selected_organizer_indices: number[];
   forced_players: string[];
   auto_forced_players: string[];
   excluded_players: string[];
@@ -33,6 +33,8 @@ export type RouletteState = {
   result: RouletteResult | null;
   round_id: string | null;
   phase: "idle" | "spinning" | "result";
+  miss_threshold: number;
+  enable_auto_force: boolean;
 };
 
 // =============================================================================

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchState, resetState } from "./api/client";
 import { RouletteResult, RouletteState } from "./types";
+import { DrawSettings } from "./components/DrawSettings";
 import { MatchInfo } from "./components/MatchInfo";
 import { OrganizerSettings } from "./components/OrganizerSettings";
 import { ParticipantManager } from "./components/ParticipantManager";
@@ -50,7 +51,7 @@ const AdminApp = () => {
       <OrganizerSettings
         organizerMode={state.organizer_mode}
         organizers={state.organizers}
-        selectedOrganizerIndex={state.selected_organizer_index}
+        selectedOrganizerIndices={state.selected_organizer_indices}
         disabled={isLocked}
         onUpdated={reload}
       />
@@ -61,12 +62,21 @@ const AdminApp = () => {
         autoForcedPlayers={state.auto_forced_players}
         excludedPlayers={state.excluded_players}
         participationCounts={state.participation_counts}
+        organizerMode={state.organizer_mode}
+        onUpdated={reload}
+      />
+
+      <DrawSettings
+        missThreshold={state.miss_threshold}
+        enableAutoForce={state.enable_auto_force}
+        disabled={isLocked}
         onUpdated={reload}
       />
 
       <RouletteController
         organizerMode={state.organizer_mode}
         organizers={state.organizers}
+        forcedPlayers={state.forced_players}
         onResult={setResult}
         onUpdated={reload}
         disabled={isLocked}
@@ -79,7 +89,7 @@ const AdminApp = () => {
         result={result}
         organizers={state.organizers}
         organizerMode={state.organizer_mode}
-        selectedOrganizerIndex={state.selected_organizer_index}
+        selectedOrganizerIndices={state.selected_organizer_indices}
       />
       <MatchInfo state={state} />
     </div>

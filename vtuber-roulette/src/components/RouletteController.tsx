@@ -4,6 +4,7 @@ import { DrawMode, OrganizerMode, RouletteResult } from "../types";
 interface Props {
   organizerMode: OrganizerMode;
   organizers: string[];
+  forcedPlayers: string[];
   onResult: (r: RouletteResult) => void;
   onUpdated: () => void;
   disabled?: boolean;
@@ -12,12 +13,14 @@ interface Props {
 export const RouletteController = ({
   organizerMode,
   organizers,
+  forcedPlayers,
   onResult,
   onUpdated,
   disabled = false,
 }: Props) => {
   const hasTwoHosts = organizers.filter((name) => name.trim()).length >= 2;
   const hostDrawDisabled = disabled || !hasTwoHosts;
+  const standard3Disabled = disabled || forcedPlayers.length > 3;
 
   const exec = async (mode: DrawMode) => {
     if (disabled) return;
@@ -37,7 +40,8 @@ export const RouletteController = ({
       <h2>抽選</h2>
       {organizerMode === "single" ? (
         <>
-          <button onClick={() => exec("standard_3")} disabled={disabled}>3人抽選</button>
+          <button onClick={() => exec("standard_3")} disabled={standard3Disabled}>3人抽選</button>
+          {standard3Disabled && !disabled && <span>手動強制が4人のため3人抽選は実行できません</span>}
           <button onClick={() => exec("standard_4")} disabled={disabled}>4人抽選</button>
         </>
       ) : (

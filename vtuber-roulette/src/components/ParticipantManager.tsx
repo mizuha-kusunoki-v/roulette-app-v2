@@ -1,5 +1,6 @@
 import { ChangeEvent, useRef, useState } from "react";
 import { updateExcludedPlayers, updateForcedPlayers, updateParticipants } from "../api/client";
+import { OrganizerMode } from "../types";
 
 interface Props {
   participants: string[];
@@ -7,6 +8,7 @@ interface Props {
   autoForcedPlayers: string[];
   excludedPlayers: string[];
   participationCounts: Record<string, number>;
+  organizerMode: OrganizerMode;
   onUpdated: () => void;
 }
 
@@ -35,8 +37,10 @@ export const ParticipantManager = ({
   autoForcedPlayers,
   excludedPlayers,
   participationCounts,
+  organizerMode,
   onUpdated,
 }: Props) => {
+  const forcedLimit = organizerMode === "double" ? 2 : 4;
   const [name, setName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,7 +66,7 @@ export const ParticipantManager = ({
       return;
     }
 
-    if (forcedPlayers.length >= 2) return;
+    if (forcedPlayers.length >= forcedLimit) return;
 
     await updateForcedPlayers([...forcedPlayers, target]);
     onUpdated();
@@ -137,7 +141,7 @@ export const ParticipantManager = ({
       <ul>
         {participants.map((player) => {
           const checkedForced = forcedPlayers.includes(player);
-          const disabledForced = !checkedForced && forcedPlayers.length >= 2;
+          const disabledForced = !checkedForced && forcedPlayers.length >= forcedLimit;
           const checkedExcluded = excludedPlayers.includes(player);
 
           return (
@@ -166,7 +170,7 @@ export const ParticipantManager = ({
           );
         })}
       </ul>
-      <p>CSV は参加者1人1行で読み書きします。手動強制は最大2人まで選択できます。</p>
+      <p>CSV は参加者1人1行で読み書きします。手動強制は最大{forcedLimit}人まで選択できます（主催2人モード時は2人まで）。</p>
     </div>
   );
 };

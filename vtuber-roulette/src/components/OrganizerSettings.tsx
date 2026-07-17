@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { updateOrganizerConfig } from "../api/client";
 import { OrganizerMode } from "../types";
 
+const MAX_ORGANIZERS = 10;
+
 interface Props {
   organizerMode: OrganizerMode;
   organizers: string[];
-  selectedOrganizerIndex: number;
+  selectedOrganizerIndices: number[];
   disabled: boolean;
   onUpdated: () => void;
 }
@@ -13,51 +15,91 @@ interface Props {
 export const OrganizerSettings = ({
   organizerMode,
   organizers,
-  selectedOrganizerIndex,
+  selectedOrganizerIndices,
   disabled,
   onUpdated,
 }: Props) => {
-  const organizer1 = organizers[0] ?? "";
-  const organizer2 = organizers[1] ?? "";
-
   const [mode, setMode] = useState<OrganizerMode>(organizerMode);
-  const [host1, setHost1] = useState(organizer1);
-  const [host2, setHost2] = useState(organizer2);
-  const [selectedIndex, setSelectedIndex] = useState(selectedOrganizerIndex === 1 ? 1 : 0);
+  const [hosts, setHosts] = useState<string[]>(organizers);
+  const [selectedIndices, setSelectedIndices] = useState<number[]>(selectedOrganizerIndices);
+  const [newName, setNewName] = useState("");
 
-  useEffect(() => {
-    setMode(organizerMode);
-  }, [organizerMode]);
+  useEffect(() => { setMode(organizerMode); }, [organizerMode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setHosts(organizers); }, [JSON.stringify(organizers)]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setSelectedIndices(selectedOrganizerIndices); }, [JSON.stringify(selectedOrganizerIndices)]);
 
-  useEffect(() => {
-    setHost1(organizer1);
-  }, [organizer1]);
+  const requiredCount = mode === "double" ? 2 : 1;
+  const canSave =
+    !disabled &&
+    selectedIndices.length === requiredCount &&
+    selectedIndices.every((i) => i >= 0 && i < hosts.length);
 
-  useEffect(() => {
-    setHost2(organizer2);
-  }, [organizer2]);
+  const addHost = () => {
+    const trimmed = newName.trim();
+    if (!trimmed || hosts.includes(trimmed) || hosts.length >= MAX_ORGANIZERS) return;
+    setHosts([...hosts, trimmed]);
+    setNewName("");
+  };
 
-  useEffect(() => {
-    setSelectedIndex(selectedOrganizerIndex === 1 ? 1 : 0);
-  }, [selectedOrganizerIndex]);
+  const removeHost = (index: number) => {
+    const next = hosts.filter((_, i) => i !== index);
+    setHosts(next);
+    setSelectedIndices(
+      selectedIndices
+        .filter((i) => i !== index)
+        .map((i) => (i > index ? i - 1 : i)),
+    );
+  };
 
-  const hasTwoHosts = host1.trim() !== "" && host2.trim() !== "";
-  const selectionDisabled = disabled || mode === "double" || !hasTwoHosts;
+  const toggleSelect = (index: number) => {
+    if (mode === "single") {
+      setSelectedIndices([index]);
+      return;
+    }
+    if (selectedIndices.includes(index)) {
+      setSelectedIndices(selectedIndices.filter((i) => i !== index));
+    } else if (selectedIndices.length < 2) {
+      setSelectedIndices([...selectedIndices, index]);
+    }
+  };
 
   const save = async () => {
-    await updateOrganizerConfig(mode, [host1, host2], selectedIndex);
+    await updateOrganizerConfig(mode, hosts, selectedIndices);
     await onUpdated();
+  };
+
+  const exportCsv = () => {
+    const blob = new Blob([hosts.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "organizers.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const validationMessage = () => {
+    if (selectedIndices.length < requiredCount) {
+      return `主催を${requiredCount}人選択してください（現在${selectedIndices.length}人）`;
+    }
+    return null;
   };
 
   return (
     <div>
       <h2>主催設定</h2>
+
       <label>
         <input
           type="radio"
           name="organizerMode"
           checked={mode === "single"}
-          onChange={() => setMode("single")}
+          onChange={() => {
+            setMode("single");
+            setSelectedIndices(selectedIndices.slice(0, 1));
+          }}
           disabled={disabled}
         />
         主催1人
@@ -74,53 +116,61 @@ export const OrganizerSettings = ({
         主催2人
       </label>
 
-      <div>
+      <div style={{ marginTop: 8 }}>
         <input
-          value={host1}
-          onChange={(e) => setHost1(e.target.value)}
-          placeholder="主催1の名前"
-          disabled={disabled}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addHost()}
+          placeholder="主催名を入力"
+          disabled={disabled || hosts.length >= MAX_ORGANIZERS}
         />
         {" "}
-        <label>
-          <input
-            type="checkbox"
-            checked={selectedIndex === 0}
-            disabled={selectionDisabled}
-            onChange={() => setSelectedIndex(0)}
-          />
-          1人主催で採用
-        </label>
-      </div>
-
-      <div>
-        <input
-          value={host2}
-          onChange={(e) => setHost2(e.target.value)}
-          placeholder="主催2の名前"
-          disabled={disabled}
-        />
+        <button
+          onClick={addHost}
+          disabled={disabled || !newName.trim() || hosts.length >= MAX_ORGANIZERS}
+        >
+          追加
+        </button>
         {" "}
-        <label>
-          <input
-            type="checkbox"
-            checked={selectedIndex === 1}
-            disabled={selectionDisabled}
-            onChange={() => setSelectedIndex(1)}
-          />
-          1人主催で採用
-        </label>
+        <button onClick={exportCsv} disabled={hosts.length === 0}>
+          CSV書き出し
+        </button>
       </div>
 
-      {!hasTwoHosts && mode === "single" && (
-        <p>主催名が2人分入力されたときだけ、採用する主催を切り替えられます。</p>
-      )}
+      <ul style={{ marginTop: 8 }}>
+        {hosts.map((name, i) => {
+          const checked = selectedIndices.includes(i);
+          const checkDisabled =
+            disabled ||
+            (!checked && mode === "double" && selectedIndices.length >= 2);
 
-      {mode === "double" && (
-        <p>主催2人モードでは入力済みの2人をそのまま主催として使用します。</p>
-      )}
+          return (
+            <li key={i}>
+              <label>
+                <input
+                  type={mode === "single" ? "radio" : "checkbox"}
+                  name="selectedOrganizer"
+                  checked={checked}
+                  disabled={checkDisabled}
+                  onChange={() => toggleSelect(i)}
+                />
+                {" "}
+                {name}
+              </label>
+              {" "}
+              <button onClick={() => removeHost(i)} disabled={disabled}>
+                削除
+              </button>
+            </li>
+          );
+        })}
+      </ul>
 
-      <button onClick={save} disabled={disabled}>
+      {hosts.length === 0 && <p>主催名を追加してください。</p>}
+
+      {validationMessage() && <p>{validationMessage()}</p>}
+
+      <button onClick={save} disabled={!canSave}>
         主催設定を保存
       </button>
     </div>
