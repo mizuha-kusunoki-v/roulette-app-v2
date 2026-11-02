@@ -162,9 +162,15 @@ def draw(req: DrawRequest):
             detail=f"{total_slots}人抽選では手動強制は{total_slots}人以内にしてください（現在{len(effective_forced)}人選択中）",
         )
 
+    has_team_forced = any(
+        v in ("A", "B") for v in state.forced_player_teams.values()
+    )
     for attempt in range(_PAIR_RETRY_MAX + 1):
         selected, spin_order, selection_reasons = select_players(req.mode)
         result = build_result(req.mode, selected)
+        # チーム固定の強制指定がある場合はその意図を優先し再抽選しない
+        if has_team_forced:
+            break
         key = compute_matchup_key(result)
         count = state.pair_counts.get(key, 0)
         # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
