@@ -171,7 +171,7 @@ def draw(req: DrawRequest):
         result = build_result(req.mode, selected)
         if all_slots_fixed:
             break
-        key = compute_matchup_key(result)
+        key = compute_matchup_key(result, organizer_set())
         count = state.pair_counts.get(key, 0)
         # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
         if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
