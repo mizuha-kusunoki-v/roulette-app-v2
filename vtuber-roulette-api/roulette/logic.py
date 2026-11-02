@@ -307,8 +307,8 @@ def apply_draw_result(
         for player in selected
         if player in selection_reasons
     }
-    key = compute_matchup_key(result, organizer_set())
-    state.pair_counts[key] = state.pair_counts.get(key, 0) + 1
+    for key in compute_team_pair_keys(result):
+        state.pair_counts[key] = state.pair_counts.get(key, 0) + 1
     state.result = result
     state.round_id = str(uuid.uuid4())
     state.phase = "spinning"
@@ -325,14 +325,13 @@ def apply_draw_result(
     )
 
 
-def compute_matchup_key(result: RouletteResult, organizers: set[str] | None = None) -> str:
-    """参加者のみでチーム構成キーを生成する（主催は除外）。チーム順・選手順不問。"""
-    orgs = organizers or set()
-    team_keys = sorted(
-        "|".join(sorted(p for p in team.players if p not in orgs))
+def compute_team_pair_keys(result: RouletteResult) -> List[str]:
+    """各チームの同チーム組み合わせキーを返す（2名以上のチームのみ）。選手順不問。"""
+    return [
+        "|".join(sorted(team.players))
         for team in result.teams
-    )
-    return "||".join(team_keys)
+        if len(team.players) >= 2
+    ]
 
 
 def delete_history_record(round_id: str) -> bool:
@@ -361,8 +360,8 @@ def delete_history_record(round_id: str) -> bool:
 
     new_pair_counts: Dict[str, int] = {}
     for rec in remaining:
-        k = compute_matchup_key(rec.result, set(rec.organizers))
-        new_pair_counts[k] = new_pair_counts.get(k, 0) + 1
+        for k in compute_team_pair_keys(rec.result):
+            new_pair_counts[k] = new_pair_counts.get(k, 0) + 1
     state.pair_counts = new_pair_counts
 
     def alive(names: List[str]) -> List[str]:

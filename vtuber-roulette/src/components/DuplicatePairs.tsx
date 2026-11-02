@@ -2,10 +2,6 @@ interface Props {
   pairCounts: Record<string, number>;
 }
 
-function parseKey(key: string): string[][] {
-  return key.split("||").map((team) => team.split("|").filter(Boolean));
-}
-
 export const DuplicatePairs = ({ pairCounts }: Props) => {
   const duplicates = Object.entries(pairCounts)
     .filter(([, count]) => count >= 2)
@@ -15,13 +11,13 @@ export const DuplicatePairs = ({ pairCounts }: Props) => {
 
   return (
     <section>
-      <h2>重複対戦ペア</h2>
+      <h2>重複チーム組み合わせ</h2>
       <ul>
         {duplicates.map(([key, count]) => {
-          const teams = parseKey(key);
+          const players = key.split("|");
           return (
             <li key={key}>
-              <strong>{count}回</strong>：{teams.map((t) => t.join("・")).join(" vs ")}
+              <strong>{count}回</strong>：{players.join("・")}
             </li>
           );
         })}

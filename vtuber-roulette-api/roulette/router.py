@@ -8,7 +8,7 @@ from .logic import (
     apply_draw_result,
     build_result,
     compute_auto_forced_players,
-    compute_matchup_key,
+    compute_team_pair_keys,
     delete_history_record,
     get_team_slots,
     organizer_set,
@@ -171,10 +171,12 @@ def draw(req: DrawRequest):
         result = build_result(req.mode, selected)
         if all_slots_fixed:
             break
-        key = compute_matchup_key(result, organizer_set())
-        count = state.pair_counts.get(key, 0)
-        # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
-        if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
+        # 各チームの同チーム組み合わせ出現回数の最大値で再抽選を判定
+        max_count = max(
+            (state.pair_counts.get(k, 0) for k in compute_team_pair_keys(result)),
+            default=0,
+        )
+        if max_count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (max_count + 1):
             break
     apply_draw_result(selected, spin_order, selection_reasons, result)
 
