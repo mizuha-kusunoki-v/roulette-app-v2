@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchState, resetState } from "./api/client";
 import { RouletteResult, RouletteState } from "./types";
 import { DrawSettings } from "./components/DrawSettings";
+import { HistoryList } from "./components/HistoryList";
 import { MatchInfo } from "./components/MatchInfo";
 import { OrganizerSettings } from "./components/OrganizerSettings";
 import { ParticipantManager } from "./components/ParticipantManager";
@@ -59,6 +60,7 @@ const AdminApp = () => {
       <ParticipantManager
         participants={state.participants}
         forcedPlayers={state.forced_players}
+        forcedPlayerTeams={state.forced_player_teams}
         autoForcedPlayers={state.auto_forced_players}
         excludedPlayers={state.excluded_players}
         participationCounts={state.participation_counts}
@@ -92,6 +94,8 @@ const AdminApp = () => {
         selectedOrganizerIndices={state.selected_organizer_indices}
       />
       <MatchInfo state={state} />
+
+      <HistoryList history={state.history} disabled={isLocked} onUpdated={reload} />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { OrganizerMode } from "../types";
 interface Props {
   participants: string[];
   forcedPlayers: string[];
+  forcedPlayerTeams: Record<string, "none" | "A" | "B">;
   autoForcedPlayers: string[];
   excludedPlayers: string[];
   participationCounts: Record<string, number>;
@@ -16,7 +17,7 @@ function parseCsvLines(text: string): string[] {
   const names: string[] = [];
 
   text
-    .replace(/^\uFEFF/, "")
+    .replace(/^﻿/, "")
     .split(/\r?\n/)
     .forEach((line) => {
       const trimmed = line.trim();
@@ -34,15 +35,17 @@ function parseCsvLines(text: string): string[] {
 export const ParticipantManager = ({
   participants,
   forcedPlayers,
+  forcedPlayerTeams,
   autoForcedPlayers,
   excludedPlayers,
   participationCounts,
   organizerMode,
   onUpdated,
 }: Props) => {
-  const forcedLimit = organizerMode === "double" ? 2 : 4;
   const [name, setName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const forcedLimit = organizerMode === "double" ? 2 : 4;
 
   const add = async () => {
     const trimmed = name.trim();
@@ -59,16 +62,24 @@ export const ParticipantManager = ({
   };
 
   const toggleForced = async (target: string) => {
-    const exists = forcedPlayers.includes(target);
-    if (exists) {
-      await updateForcedPlayers(forcedPlayers.filter((p) => p !== target));
+    if (forcedPlayers.includes(target)) {
+      const newForced = forcedPlayers.filter((p) => p !== target);
+      const newTeams = { ...forcedPlayerTeams };
+      delete newTeams[target];
+      await updateForcedPlayers(newForced, newTeams);
       onUpdated();
       return;
     }
 
     if (forcedPlayers.length >= forcedLimit) return;
 
-    await updateForcedPlayers([...forcedPlayers, target]);
+    await updateForcedPlayers([...forcedPlayers, target], forcedPlayerTeams);
+    onUpdated();
+  };
+
+  const setForcedTeam = async (target: string, team: "none" | "A" | "B") => {
+    const newTeams = { ...forcedPlayerTeams, [target]: team };
+    await updateForcedPlayers(forcedPlayers, newTeams);
     onUpdated();
   };
 
@@ -143,6 +154,7 @@ export const ParticipantManager = ({
           const checkedForced = forcedPlayers.includes(player);
           const disabledForced = !checkedForced && forcedPlayers.length >= forcedLimit;
           const checkedExcluded = excludedPlayers.includes(player);
+          const currentTeam = forcedPlayerTeams[player] ?? "none";
 
           return (
             <li key={player}>
@@ -153,6 +165,17 @@ export const ParticipantManager = ({
                 onChange={() => toggleForced(player)}
               />{" "}
               強制
+              {checkedForced && (
+                <select
+                  value={currentTeam}
+                  onChange={(e) => setForcedTeam(player, e.target.value as "none" | "A" | "B")}
+                  style={{ marginLeft: 4 }}
+                >
+                  <option value="none">チーム指定なし</option>
+                  <option value="A">チームA固定</option>
+                  <option value="B">チームB固定</option>
+                </select>
+              )}
               {" "}
               <input
                 type="checkbox"
@@ -163,7 +186,7 @@ export const ParticipantManager = ({
               {" "}
               {player} (参加回数: {participationCounts[player] ?? 0}){" "}
               {autoForcedPlayers.includes(player) && <span>[自動強制対象]</span>}{" "}
-              {checkedForced && <span>[手動強制]</span>}{" "}
+              {checkedForced && <span>[手動強制{currentTeam !== "none" ? `・チーム${currentTeam}固定` : ""}]</span>}{" "}
               {checkedExcluded && <span>[除外中]</span>}{" "}
               <button onClick={() => remove(player)}>削除</button>
             </li>

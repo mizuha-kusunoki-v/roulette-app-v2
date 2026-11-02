@@ -47,11 +47,14 @@ export async function updateOrganizerConfig(
   await ensureOk(res);
 }
 
-export async function updateForcedPlayers(forcedPlayers: string[]) {
+export async function updateForcedPlayers(
+  forcedPlayers: string[],
+  forcedPlayerTeams: Record<string, "none" | "A" | "B"> = {},
+) {
   const res = await fetch(`${BASE_URL}/forced_players`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ forced_players: forcedPlayers }),
+    body: JSON.stringify({ forced_players: forcedPlayers, forced_player_teams: forcedPlayerTeams }),
   });
   await ensureOk(res);
 }
@@ -98,6 +101,14 @@ export async function notifyPresentationComplete(roundId: string) {
 export async function resetState() {
   const res = await fetch(`${BASE_URL}/reset`, {
     method: "POST",
+  });
+  await ensureOk(res);
+}
+
+
+export async function deleteHistoryRecord(roundId: string) {
+  const res = await fetch(`${BASE_URL}/history/${encodeURIComponent(roundId)}`, {
+    method: "DELETE",
   });
   await ensureOk(res);
 }
