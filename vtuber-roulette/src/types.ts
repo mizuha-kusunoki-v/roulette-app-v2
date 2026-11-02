@@ -36,6 +36,7 @@ export type RouletteState = {
   auto_forced_players: string[];
   excluded_players: string[];
   participation_counts: Record<string, number>;
+  pair_counts: Record<string, number>;
   prev_players: string[];
   last_players: string[];
   spin_order: string[];

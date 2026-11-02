@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchState, resetState } from "./api/client";
 import { RouletteResult, RouletteState } from "./types";
 import { DrawSettings } from "./components/DrawSettings";
+import { DuplicatePairs } from "./components/DuplicatePairs";
 import { HistoryList } from "./components/HistoryList";
 import { MatchInfo } from "./components/MatchInfo";
 import { OrganizerSettings } from "./components/OrganizerSettings";
@@ -94,6 +95,8 @@ const AdminApp = () => {
         selectedOrganizerIndices={state.selected_organizer_indices}
       />
       <MatchInfo state={state} />
+
+      <DuplicatePairs pairCounts={state.pair_counts} />
 
       <HistoryList history={state.history} disabled={isLocked} onUpdated={reload} />
     </div>
