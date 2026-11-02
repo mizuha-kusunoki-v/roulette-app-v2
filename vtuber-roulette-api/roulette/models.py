@@ -16,17 +16,29 @@ class RouletteResult(BaseModel):
     teams: List[ResultTeam]
 
 
+class DrawRecord(BaseModel):
+    round_id: str
+    drawn_at: str  # ISO8601
+    result: RouletteResult
+    selected: List[str]  # 抽選で選ばれた参加者 (主催を除く)
+    organizers: List[str]  # 抽選時点の有効な主催
+    participants: List[str]  # 抽選時点の参加者
+    reasons: Dict[str, str] = {}
+
+
 class RouletteState(BaseModel):
     participants: List[str] = []
     organizer_mode: OrganizerMode = "single"
     organizers: List[str] = []
     selected_organizer_indices: List[int] = [0]
     forced_players: List[str] = []
+    forced_player_teams: Dict[str, str] = {}
     miss_threshold: int = 3
     enable_auto_force: bool = False
     auto_forced_players: List[str] = []
     excluded_players: List[str] = []
     participation_counts: Dict[str, int] = {}
+    pair_counts: Dict[str, int] = {}
     prev_players: List[str] = []
     last_players: List[str] = []
     spin_order: List[str] = []
@@ -35,6 +47,7 @@ class RouletteState(BaseModel):
     result: RouletteResult | None = None
     round_id: str | None = None
     phase: Literal["idle", "spinning", "result"] = "idle"
+    history: List[DrawRecord] = []
 
 
 # ── リクエストモデル ──────────────────────────────────────────────────────────
@@ -51,6 +64,7 @@ class OrganizerConfigRequest(BaseModel):
 
 class ForcedPlayersRequest(BaseModel):
     forced_players: List[str]
+    forced_player_teams: Dict[str, str] = {}
 
 
 class ExcludedPlayersRequest(BaseModel):

@@ -16,12 +16,23 @@ export type RouletteResult = {
   teams: RouletteResultTeam[];
 };
 
+export type DrawRecord = {
+  round_id: string;
+  drawn_at: string;
+  result: RouletteResult;
+  selected: string[];
+  organizers: string[];
+  participants: string[];
+  reasons: Record<string, string>;
+};
+
 export type RouletteState = {
   participants: string[];
   organizer_mode: OrganizerMode;
   organizers: string[];
   selected_organizer_indices: number[];
   forced_players: string[];
+  forced_player_teams: Record<string, "none" | "A" | "B">;
   auto_forced_players: string[];
   excluded_players: string[];
   participation_counts: Record<string, number>;
@@ -35,6 +46,7 @@ export type RouletteState = {
   phase: "idle" | "spinning" | "result";
   miss_threshold: number;
   enable_auto_force: boolean;
+  history: DrawRecord[];
 };
 
 // =============================================================================
