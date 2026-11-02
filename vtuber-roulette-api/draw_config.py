@@ -4,6 +4,12 @@ Draw policy settings.
 Adjust these values to tune auto-force behavior.
 """
 
+# ── 主催初期値 ─────────────────────────────────────────────────────────────────
+# サーバー起動時およびリセット時に自動で設定される主催名。
+# 空文字列の場合は設定しない。
+INITIAL_ORGANIZER: str = ""
+
+# ── 自動強制抽選 ───────────────────────────────────────────────────────────────
 # If enabled, players far below the participation median are force-selected.
 ENABLE_AUTO_FORCE_BY_MEDIAN_GAP = True
 

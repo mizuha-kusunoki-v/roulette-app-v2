@@ -9,17 +9,29 @@ from fastapi import HTTPException
 from draw_config import (
     AUTO_FORCE_MAX_PER_DRAW,
     AUTO_FORCE_MEDIAN_GAP,
+    INITIAL_ORGANIZER,
 )
 from .models import DrawMode, DrawRecord, ResultTeam, RouletteResult, RouletteState
 
 # ── グローバル状態 ─────────────────────────────────────────────────────────────
 
+def _apply_initial_config(s: RouletteState) -> None:
+    """draw_config の初期値をステートに反映する。"""
+    name = INITIAL_ORGANIZER.strip()
+    if name:
+        s.organizers = [name]
+        s.selected_organizer_indices = [0]
+        s.organizer_mode = "single"
+
+
 state = RouletteState()
+_apply_initial_config(state)
 
 
 def reset_state() -> None:
     # router 側が import 済みの state を参照し続けるため、再代入せず中身を初期化する
     fresh = RouletteState()
+    _apply_initial_config(fresh)
     for field in RouletteState.model_fields:
         setattr(state, field, getattr(fresh, field))
 
