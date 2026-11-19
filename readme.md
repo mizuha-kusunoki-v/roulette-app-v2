@@ -1,7 +1,7 @@
 # VTuber ルーレットアプリ
 
 配信用のチーム対戦メンバー抽選ツールです。  
-React フロントエンド + FastAPI バックエンドの構成で動作します。
+React (Vite) フロントエンド + FastAPI バックエンドの構成で動作します。
 
 ---
 
@@ -34,7 +34,9 @@ React フロントエンド + FastAPI バックエンドの構成で動作しま
 
 ```
 roulette-app_new/
-├── vtuber-roulette/         # フロントエンド (React)
+├── vtuber-roulette/         # フロントエンド (React + Vite)
+│   ├── index.html           # エントリー HTML
+│   ├── vite.config.ts       # Vite 設定 (開発サーバーは port 3000)
 │   └── src/
 │       ├── AdminApp.tsx     # 管理画面
 │       ├── App.tsx          # OBS ビュワー統合
@@ -59,7 +61,7 @@ roulette-app_new/
 
 ### 必要なもの
 - Python 3.11+
-- Node.js 18+
+- Node.js 20.19+ または 22.12+（Vite 8 の要件）
 
 ### バックエンド
 
