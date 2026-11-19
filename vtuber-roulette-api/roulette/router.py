@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from .changes import state_changes
@@ -21,13 +21,13 @@ from .logic import (
     new_record,
     remove_participant,
     replace_participants,
-    reset_state,
+    reset_session,
     save_settings,
     select_players,
     set_excluded,
     set_forced,
-    state,
 )
+from .models import RouletteState
 from .messages import describe_draw_block, forced_limit_exceeded
 from .protocol import (
     DrawRequest,
@@ -46,58 +46,69 @@ _PAIR_RETRY_MAX = 10
 
 router = APIRouter()
 
+# 抽選のセッション。エンドポイントは依存性注入 (Depends(current_session)) で受け取る
+_session = RouletteState()
 
-def _require_participant(name: str) -> None:
-    if name not in state.participants:
+
+def current_session() -> RouletteState:
+    return _session
+
+
+Session = Depends(current_session)
+
+
+def _require_participant(session: RouletteState, name: str) -> None:
+    if name not in session.participants:
         raise HTTPException(status_code=404, detail=f"参加者「{name}」が見つかりません")
 
 
 @router.put("/participants")
-def put_participants(req: ReplaceParticipantsRequest):
-    replace_participants(req.names)
+def put_participants(req: ReplaceParticipantsRequest, session: RouletteState = Session):
+    replace_participants(session, req.names)
     return {"ok": True}
 
 
 @router.post("/participants/add")
-def post_participant_add(req: ParticipantRequest):
+def post_participant_add(req: ParticipantRequest, session: RouletteState = Session):
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="参加者名を入力してください")
-    if name in state.participants:
+    if name in session.participants:
         raise HTTPException(status_code=409, detail=f"参加者「{name}」はすでにいます")
-    add_participant(name)
+    add_participant(session, name)
     return {"ok": True}
 
 
 @router.post("/participants/remove")
-def post_participant_remove(req: ParticipantRequest):
-    _require_participant(req.name)
-    remove_participant(req.name)
+def post_participant_remove(req: ParticipantRequest, session: RouletteState = Session):
+    _require_participant(session, req.name)
+    remove_participant(session, req.name)
     return {"ok": True}
 
 
 @router.post("/participants/forced")
-def post_participant_forced(req: SetForcedRequest):
-    _require_participant(req.name)
+def post_participant_forced(req: SetForcedRequest, session: RouletteState = Session):
+    _require_participant(session, req.name)
     # プロトコルではチーム指定なしを "any"、内部では "none" で持つ
     team = None if req.forced is None else ("none" if req.forced == "any" else req.forced)
     try:
-        set_forced(req.name, team)
+        set_forced(session, req.name, team)
     except ForcedLimitError as e:
         raise HTTPException(status_code=400, detail=forced_limit_exceeded(e.limit))
     return {"ok": True}
 
 
 @router.post("/participants/excluded")
-def post_participant_excluded(req: SetExcludedRequest):
-    _require_participant(req.name)
-    set_excluded(req.name, req.excluded)
+def post_participant_excluded(req: SetExcludedRequest, session: RouletteState = Session):
+    _require_participant(session, req.name)
+    set_excluded(session, req.name, req.excluded)
     return {"ok": True}
 
 
 @router.put("/organizers")
-def put_organizers(req: SaveOrganizersRequest):
+def put_organizers(req: SaveOrganizersRequest, session: RouletteState = Session):
     configure_organizers(
+        session,
         req.organizer_mode,
         [o.name for o in req.organizers],
         [o.name for o in req.organizers if o.active],
@@ -106,63 +117,64 @@ def put_organizers(req: SaveOrganizersRequest):
 
 
 @router.put("/settings")
-def put_settings(req: SaveSettingsRequest):
+def put_settings(req: SaveSettingsRequest, session: RouletteState = Session):
     if req.miss_threshold < 1:
         raise HTTPException(status_code=400, detail="救済閾値は1以上にしてください")
-    save_settings(req.miss_threshold, req.enable_auto_force)
+    save_settings(session, req.miss_threshold, req.enable_auto_force)
     return {"ok": True}
 
 
 @router.post("/draw")
-def draw(req: DrawRequest):
-    block = draw_blocker(req.mode)
+def draw(req: DrawRequest, session: RouletteState = Session):
+    block = draw_blocker(session, req.mode)
     if block is not None:
         raise HTTPException(status_code=400, detail=describe_draw_block(block))
 
-    organizers = active_organizers()
+    organizers = active_organizers(session)
     for attempt in range(_PAIR_RETRY_MAX + 1):
-        selection = select_players(req.mode)
+        selection = select_players(session, req.mode)
         result = build_result(req.mode, selection, organizers)
-        count = state.pair_counts.get(compute_matchup_key(result), 0)
+        count = session.pair_counts.get(compute_matchup_key(result), 0)
         # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
         if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
             break
     apply_draw_result(
+        session,
         new_record(
             round_id=str(uuid.uuid4()),
             drawn_at=datetime.now(timezone.utc).isoformat(),
             result=result,
             selection=selection,
             organizers=organizers,
-            participants=state.participants,
+            participants=session.participants,
         )
     )
 
     # 結果は /session と /ws/session で届くので、ここでは回の ID だけを返す (内部のモデルを外に出さない)
-    return {"round_id": state.round_id}
+    return {"round_id": session.round_id}
 
 
 @router.post("/presentation_complete")
-def presentation_complete(req: PresentationCompleteRequest):
-    if req.round_id != state.round_id:
+def presentation_complete(req: PresentationCompleteRequest, session: RouletteState = Session):
+    if req.round_id != session.round_id:
         return {"ok": False, "reason": "round_id_mismatch"}
 
-    state.phase = "result"
+    session.phase = "result"
     return {"ok": True}
 
 
 @router.delete("/history/{round_id}")
-def delete_history(round_id: str):
-    if state.phase == "spinning":
+def delete_history(round_id: str, session: RouletteState = Session):
+    if session.phase == "spinning":
         raise HTTPException(status_code=400, detail="抽選演出中は削除できません")
-    if not delete_history_record(round_id):
+    if not delete_history_record(session, round_id):
         raise HTTPException(status_code=404, detail="指定した抽選結果が見つかりません")
     return {"ok": True}
 
 
 @router.post("/reset")
-def reset():
-    reset_state()
+def reset(session: RouletteState = Session):
+    reset_session(session)
     return {"ok": True}
 
 
@@ -203,10 +215,10 @@ async def _serve(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
 
 
 @router.get("/session")
-def get_session() -> SessionState:
-    return build_session_state()
+def get_session(session: RouletteState = Session) -> SessionState:
+    return build_session_state(session)
 
 
 @router.websocket("/ws/session")
 async def session_websocket(ws: WebSocket):
-    await _serve(ws, build_session_state)
+    await _serve(ws, lambda: build_session_state(current_session()))

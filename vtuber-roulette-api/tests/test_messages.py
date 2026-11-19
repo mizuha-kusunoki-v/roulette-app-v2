@@ -13,6 +13,7 @@ from roulette.models import (
     TooManyForced,
 )
 from roulette.messages import describe_draw_block
+from tests import harness
 from tests.simulation import setup_session
 
 
@@ -45,10 +46,10 @@ def test_messages_read_as_before(block, message):
 def test_draw_blocker_reports_the_reason_and_numbers_without_wording():
     setup_session(6, "standard_3", forced=["P00", "P01"], forced_teams={"P00": "A", "P01": "A"})
 
-    assert draw_blocker("standard_3") == TeamForcedOverSlots(team="A", forced=2, slots=1)
+    assert draw_blocker(harness.session(), "standard_3") == TeamForcedOverSlots(team="A", forced=2, slots=1)
 
-    set_forced("P00", "none")
-    set_forced("P01", "none")
+    set_forced(harness.session(), "P00", "none")
+    set_forced(harness.session(), "P01", "none")
     for p in ("P02", "P03", "P04", "P05"):
-        set_excluded(p, True)
-    assert draw_blocker("standard_4") == NotEnoughParticipants(needed=4, eligible=2)
+        set_excluded(harness.session(), p, True)
+    assert draw_blocker(harness.session(), "standard_4") == NotEnoughParticipants(needed=4, eligible=2)

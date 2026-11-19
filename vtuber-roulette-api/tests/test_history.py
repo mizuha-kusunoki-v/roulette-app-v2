@@ -41,7 +41,7 @@ def test_counts_after_each_draw_equal_a_recount_of_the_history():
         if rng.random() < 0.3:
             names = [p for p in harness.participants() if rng.random() > 0.1] + [next(new_names)]
             if len(names) >= 4:
-                replace_participants(names)
+                replace_participants(harness.session(), names)
         draw("standard_4")
 
         assert counts_in_state() == counts_from_history()
@@ -55,7 +55,7 @@ def test_deleting_the_latest_round_restores_what_was_before_it():
     before = latest_round()
 
     latest = draw("standard_4")
-    assert delete_history_record(harness.round_id())
+    assert delete_history_record(harness.session(), harness.round_id())
 
     assert latest_round() == before
     assert harness.phase() == "result"
@@ -68,7 +68,7 @@ def test_deleting_a_middle_round_recounts_from_the_rest():
         draw("standard_4")
     middle = harness.history_round_ids()[2]
 
-    assert delete_history_record(middle)
+    assert delete_history_record(harness.session(), middle)
 
     assert middle not in harness.history_round_ids()
     assert counts_in_state() == counts_from_history()
@@ -79,7 +79,7 @@ def test_deleting_every_round_returns_to_idle():
     setup_session(5)
     draw("standard_4")
 
-    assert delete_history_record(harness.round_id())
+    assert delete_history_record(harness.session(), harness.round_id())
 
     assert harness.phase() == "idle"
     assert harness.round_id() is None and harness.last_round_players() == []
@@ -115,7 +115,7 @@ def test_removing_a_participant_drops_them_from_the_latest_rounds():
     latest = draw("standard_4")
     gone = [latest.selected[0], before_latest.selected[0]]
 
-    replace_participants([p for p in harness.participants() if p not in gone])
+    replace_participants(harness.session(), [p for p in harness.participants() if p not in gone])
 
     assert not set(gone) & set(harness.last_round_players())
     assert not set(gone) & set(harness.previous_round_players())

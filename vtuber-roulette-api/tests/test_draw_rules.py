@@ -121,7 +121,7 @@ def test_players_who_missed_too_often_are_selected_when_they_fit():
 def test_a_participant_with_the_same_name_as_an_organizer_is_an_ordinary_participant():
     # 主催と参加者の名前の一致は偶然の一致で、別人として扱う (運用では被らない前提だが、照合はしない)
     setup_session(4, "standard_3", forced=["P00"], forced_teams={"P00": "B"})
-    logic.configure_organizers("single", ["P00"], ["P00"])
+    logic.configure_organizers(harness.session(), "single", ["P00"], ["P00"])
 
     r = draw("standard_3")
 

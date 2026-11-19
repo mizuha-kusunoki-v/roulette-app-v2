@@ -118,3 +118,16 @@ def test_settings_are_saved_and_validated(client):
     assert session(client)["settings"]["enable_auto_force"] is True
 
     assert client.put("/settings", json={"miss_threshold": 0, "enable_auto_force": True}).status_code == 400
+
+
+def test_reset_returns_to_the_initial_state(client):
+    client.put("/participants", json={"names": ["A", "B", "C", "D"]})
+    client.put("/settings", json={"miss_threshold": 5, "enable_auto_force": True})
+    client.post("/draw", json={"mode": "standard_4"})
+
+    assert client.post("/reset").status_code == 200
+
+    s = session(client)
+    assert s["participants"] == [] and s["history"] == [] and s["phase"] == "idle"
+    assert s["settings"]["miss_threshold"] == 3
+

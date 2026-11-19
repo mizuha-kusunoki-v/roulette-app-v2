@@ -38,18 +38,19 @@ def setup_session(
 
     forced_teams は "none" (チーム指定なし) / "A" / "B"。
     """
-    logic.reset_state()
-    logic.replace_participants(players(n))
+    session = harness.session()
+    logic.reset_session(session)
+    logic.replace_participants(session, players(n))
     if mode in HOST_MODES:
-        logic.configure_organizers("double", ["Host1", "Host2"], ["Host1", "Host2"])
+        logic.configure_organizers(session, "double", ["Host1", "Host2"], ["Host1", "Host2"])
     elif mode == "standard_3":
-        logic.configure_organizers("single", ["Host1"], ["Host1"])
-    logic.save_settings(miss_threshold, auto_force)
+        logic.configure_organizers(session, "single", ["Host1"], ["Host1"])
+    logic.save_settings(session, miss_threshold, auto_force)
     for p in excluded:
-        logic.set_excluded(p, True)
+        logic.set_excluded(session, p, True)
     teams = forced_teams or {}
     for p in forced:
-        logic.set_forced(p, teams.get(p, "none"))
+        logic.set_forced(session, p, teams.get(p, "none"))
 
 
 def slots(mode: DrawMode) -> int:
@@ -70,7 +71,7 @@ class Round:
 
 def draw(mode: DrawMode) -> Round:
     before = harness.before()
-    router.draw(DrawRequest(mode=mode))
+    router.draw(DrawRequest(mode=mode), harness.session())
     a_slots, _ = get_team_slots(mode)
     record = harness.latest_record()
     return Round(

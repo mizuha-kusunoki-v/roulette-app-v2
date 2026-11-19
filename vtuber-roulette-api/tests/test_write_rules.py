@@ -18,7 +18,9 @@ DERIVED = {
     "result",
     "round_id",
 }
-WRITERS = {"_store_tally", "_show_latest_round", "reset_state"}
+WRITERS = {"_store_tally", "_show_latest_round", "reset_session"}
+# セッションを表す変数名 (logic などの関数は引数 session で受け取る)
+SESSION_NAMES = {"session", "state"}
 SOURCES = sorted((Path(__file__).parent.parent / "roulette").glob("*.py"))
 
 
@@ -34,17 +36,17 @@ def writes_outside_writers(path: Path) -> list[str]:
         elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
             targets = [node.target]
         for target in targets:
-            # state.<名前> = ... と state.<名前>[...] = ... の両方を見る
+            # session.<名前> = ... と session.<名前>[...] = ... の両方を見る
             while isinstance(target, ast.Subscript):
                 target = target.value
             if (
                 isinstance(target, ast.Attribute)
                 and isinstance(target.value, ast.Name)
-                and target.value.id == "state"
+                and target.value.id in SESSION_NAMES
                 and target.attr in DERIVED
                 and function not in WRITERS
             ):
-                found.append(f"{path.name}:{node.lineno} {function} writes state.{target.attr}")
+                found.append(f"{path.name}:{node.lineno} {function} writes {target.value.id}.{target.attr}")
         for child in ast.iter_child_nodes(node):
             visit(child, function)
 

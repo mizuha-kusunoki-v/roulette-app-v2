@@ -41,5 +41,5 @@ def test_state_wrapper_skips_forced_resting_excluded_and_due_players():
     harness.set_last_round_players(["P00"])
 
     # P00 は前回出た、P01 はミス回数の保証の対象、P02 は除外中、P03 は手動強制
-    assert auto_forced_players() == ["P04"]
-    assert auto_forced_players(already_selected=["P04"]) == []
+    assert auto_forced_players(harness.session()) == ["P04"]
+    assert auto_forced_players(harness.session(), already_selected=["P04"]) == []
