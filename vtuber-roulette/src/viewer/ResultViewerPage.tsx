@@ -1,68 +1,35 @@
 import { useEffect, useRef, useState } from "react";
-import { notifyPresentationComplete } from "../api/client";
-import { RouletteState } from "../types";
+import { useRoundAnimation } from "../session/useRoundAnimation";
+import { useSessionState } from "../session/useSessionState";
 import { getDisplayTeams } from "../utils/resultDisplay";
 import "./roulette.css";
 
-const ANIMATION_DURATION_MS = 5000;
+const SLOT_INTERVAL_MS = 80;
 
 export const ResultViewerPage = () => {
-  const [serverState, setServerState] = useState<RouletteState | null>(null);
+  const { state } = useSessionState();
+  const animatingRoundId = useRoundAnimation(state);
   const [displayName, setDisplayName] = useState<string>("");
-  const [animating, setAnimating] = useState(false);
 
-  const lastRoundIdRef = useRef<string | null>(null);
-  const completedRoundIdRef = useRef<string | null>(null);
-  const intervalRef = useRef<number | null>(null);
+  // 演出の間に入れ替える名前は、そのときの参加者から選ぶ
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
-    ws.onmessage = (e) => {
-      const incoming = JSON.parse(e.data) as RouletteState;
-      setServerState(incoming);
-    };
-    return () => ws.close();
-  }, []);
+    if (animatingRoundId === null) return;
+    const id = window.setInterval(() => {
+      const names = stateRef.current?.participants.map((p) => p.name) ?? [];
+      if (names.length > 0) setDisplayName(names[Math.floor(Math.random() * names.length)]);
+    }, SLOT_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [animatingRoundId]);
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current !== null) clearInterval(intervalRef.current);
-    };
-  }, []);
+  if (!state) return <p>Loading...</p>;
 
-  useEffect(() => {
-    if (!serverState?.round_id || !serverState.result) return;
-    if (serverState.phase !== "spinning") return;
-    if (serverState.round_id === lastRoundIdRef.current) return;
-
-    lastRoundIdRef.current = serverState.round_id;
-    const roundId = serverState.round_id;
-    const candidates = [...serverState.participants];
-
-    if (intervalRef.current !== null) clearInterval(intervalRef.current);
-
-    setAnimating(true);
-    const startTime = Date.now();
-
-    intervalRef.current = window.setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      if (elapsed >= ANIMATION_DURATION_MS) {
-        clearInterval(intervalRef.current!);
-        intervalRef.current = null;
-        setAnimating(false);
-        if (completedRoundIdRef.current !== roundId) {
-          completedRoundIdRef.current = roundId;
-          notifyPresentationComplete(roundId);
-        }
-        return;
-      }
-      setDisplayName(candidates[Math.floor(Math.random() * candidates.length)]);
-    }, 80);
-  }, [serverState]);
-
-  if (!serverState) return <p>Loading...</p>;
-
-  if (animating) {
+  // 演出中の回がリセットや削除でなくなったら、演出は出さない
+  if (animatingRoundId !== null && state.current_round?.round_id === animatingRoundId) {
     return (
       <div className="viewer-screen viewer-center">
         <div className="status-panel">抽選中...</div>
@@ -71,15 +38,7 @@ export const ResultViewerPage = () => {
     );
   }
 
-  if (serverState.phase === "spinning") {
-    return (
-      <div className="viewer-screen viewer-center">
-        <div className="status-panel">抽選中</div>
-      </div>
-    );
-  }
-
-  if (!serverState.result) {
+  if (!state.current_round) {
     return (
       <div className="viewer-screen viewer-center">
         <div className="status-panel">抽選結果待機中</div>
@@ -87,12 +46,7 @@ export const ResultViewerPage = () => {
     );
   }
 
-  const teams = getDisplayTeams(
-    serverState.result,
-    serverState.organizers,
-    serverState.organizer_mode,
-    serverState.selected_organizer_indices,
-  );
+  const teams = getDisplayTeams(state.current_round.result, state.organizers);
 
   return (
     <div className="viewer-screen viewer-center">

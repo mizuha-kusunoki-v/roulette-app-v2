@@ -16,3 +16,8 @@ AUTO_FORCE_MEDIAN_GAP = 2
 # Limit auto-forced players per draw. 0 means no limit.
 AUTO_FORCE_MAX_PER_DRAW = 2
 
+# How long the slot animation runs (milliseconds).
+# The backend does not wait for it: a draw is final the moment it is made.
+# This is the only place the duration is defined; it is sent to the screens in SessionState,
+# and the viewer animation and the admin's temporary lock both read it from there.
+PRESENTATION_DURATION_MS = 5000

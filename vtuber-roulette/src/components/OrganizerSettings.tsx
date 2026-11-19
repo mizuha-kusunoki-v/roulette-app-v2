@@ -1,24 +1,22 @@
 import { useEffect, useState } from "react";
-import { updateOrganizerConfig } from "../api/client";
-import { OrganizerMode } from "../types";
+import { saveOrganizers } from "../api/client";
+import { Organizer, OrganizerMode } from "../types";
 
 const MAX_ORGANIZERS = 10;
 
 interface Props {
   organizerMode: OrganizerMode;
-  organizers: string[];
-  selectedOrganizerIndices: number[];
-  disabled: boolean;
+  organizers: Organizer[];
   onUpdated: () => void;
 }
 
-export const OrganizerSettings = ({
-  organizerMode,
-  organizers,
-  selectedOrganizerIndices,
-  disabled,
-  onUpdated,
-}: Props) => {
+export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, onUpdated }: Props) => {
+  // 保存済みの主催。編集中の値 (hosts, selectedIndices) はこの画面の中だけで持ち、保存で送る
+  const organizers = savedOrganizers.map((o) => o.name);
+  const activeIndices = savedOrganizers.flatMap((o, i) => (o.active ? [i] : []));
+  // 誰も選ばれていなければ先頭を選んだ状態から始める (主催を初めて追加したとき、その人が選ばれた状態になる)
+  const selectedOrganizerIndices = activeIndices.length > 0 ? activeIndices : [0];
+
   const [mode, setMode] = useState<OrganizerMode>(organizerMode);
   const [hosts, setHosts] = useState<string[]>(organizers);
   const [selectedIndices, setSelectedIndices] = useState<number[]>(selectedOrganizerIndices);
@@ -32,7 +30,6 @@ export const OrganizerSettings = ({
 
   const requiredCount = mode === "double" ? 2 : 1;
   const canSave =
-    !disabled &&
     selectedIndices.length === requiredCount &&
     selectedIndices.every((i) => i >= 0 && i < hosts.length);
 
@@ -66,8 +63,15 @@ export const OrganizerSettings = ({
   };
 
   const save = async () => {
-    await updateOrganizerConfig(mode, hosts, selectedIndices);
-    await onUpdated();
+    try {
+      await saveOrganizers(
+        mode,
+        hosts.map((name, i) => ({ name, active: selectedIndices.includes(i) })),
+      );
+      onUpdated();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "主催設定の保存に失敗しました。");
+    }
   };
 
   const exportCsv = () => {
@@ -100,7 +104,6 @@ export const OrganizerSettings = ({
             setMode("single");
             setSelectedIndices(selectedIndices.slice(0, 1));
           }}
-          disabled={disabled}
         />
         主催1人
       </label>
@@ -111,7 +114,6 @@ export const OrganizerSettings = ({
           name="organizerMode"
           checked={mode === "double"}
           onChange={() => setMode("double")}
-          disabled={disabled}
         />
         主催2人
       </label>
@@ -122,12 +124,12 @@ export const OrganizerSettings = ({
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addHost()}
           placeholder="主催名を入力"
-          disabled={disabled || hosts.length >= MAX_ORGANIZERS}
+          disabled={hosts.length >= MAX_ORGANIZERS}
         />
         {" "}
         <button
           onClick={addHost}
-          disabled={disabled || !newName.trim() || hosts.length >= MAX_ORGANIZERS}
+          disabled={!newName.trim() || hosts.length >= MAX_ORGANIZERS}
         >
           追加
         </button>
@@ -140,9 +142,7 @@ export const OrganizerSettings = ({
       <ul style={{ marginTop: 8 }}>
         {hosts.map((name, i) => {
           const checked = selectedIndices.includes(i);
-          const checkDisabled =
-            disabled ||
-            (!checked && mode === "double" && selectedIndices.length >= 2);
+          const checkDisabled = !checked && mode === "double" && selectedIndices.length >= 2;
 
           return (
             <li key={i}>
@@ -158,7 +158,7 @@ export const OrganizerSettings = ({
                 {name}
               </label>
               {" "}
-              <button onClick={() => removeHost(i)} disabled={disabled}>
+              <button onClick={() => removeHost(i)}>
                 削除
               </button>
             </li>

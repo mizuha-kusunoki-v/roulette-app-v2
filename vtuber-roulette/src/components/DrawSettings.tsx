@@ -1,28 +1,26 @@
 import { useEffect, useState } from "react";
-import { updateDrawSettings } from "../api/client";
+import { saveSettings } from "../api/client";
+import { SessionState } from "../types";
 
 interface Props {
-  missThreshold: number;
-  enableAutoForce: boolean;
-  disabled: boolean;
+  settings: SessionState["settings"];
   onUpdated: () => void;
 }
 
-export const DrawSettings = ({
-  missThreshold,
-  enableAutoForce,
-  disabled,
-  onUpdated,
-}: Props) => {
-  const [threshold, setThreshold] = useState(missThreshold);
-  const [autoForce, setAutoForce] = useState(enableAutoForce);
+export const DrawSettings = ({ settings, onUpdated }: Props) => {
+  const [threshold, setThreshold] = useState(settings.miss_threshold);
+  const [autoForce, setAutoForce] = useState(settings.enable_auto_force);
 
-  useEffect(() => { setThreshold(missThreshold); }, [missThreshold]);
-  useEffect(() => { setAutoForce(enableAutoForce); }, [enableAutoForce]);
+  useEffect(() => { setThreshold(settings.miss_threshold); }, [settings.miss_threshold]);
+  useEffect(() => { setAutoForce(settings.enable_auto_force); }, [settings.enable_auto_force]);
 
   const save = async () => {
-    await updateDrawSettings(threshold, autoForce);
-    await onUpdated();
+    try {
+      await saveSettings(threshold, autoForce);
+      onUpdated();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "抽選設定の保存に失敗しました。");
+    }
   };
 
   return (
@@ -38,7 +36,6 @@ export const DrawSettings = ({
             max={20}
             value={threshold}
             onChange={(e) => setThreshold(Math.max(1, Number(e.target.value)))}
-            disabled={disabled}
             style={{ width: 60, marginLeft: 8 }}
           />
           回
@@ -54,7 +51,6 @@ export const DrawSettings = ({
             type="checkbox"
             checked={autoForce}
             onChange={(e) => setAutoForce(e.target.checked)}
-            disabled={disabled}
           />
           {" "}
           参加回数の中央値乖離による自動強制を有効にする
@@ -64,7 +60,7 @@ export const DrawSettings = ({
         </p>
       </div>
 
-      <button onClick={save} disabled={disabled} style={{ marginTop: 12 }}>
+      <button onClick={save} style={{ marginTop: 12 }}>
         抽選設定を保存
       </button>
     </div>

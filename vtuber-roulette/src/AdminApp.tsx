@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
-import { fetchState, resetState } from "./api/client";
-import { RouletteResult, RouletteState } from "./types";
+import { resetState } from "./api/client";
 import { DrawSettings } from "./components/DrawSettings";
 import { HistoryList } from "./components/HistoryList";
 import { MatchInfo } from "./components/MatchInfo";
@@ -8,94 +6,57 @@ import { OrganizerSettings } from "./components/OrganizerSettings";
 import { ParticipantManager } from "./components/ParticipantManager";
 import { RouletteController } from "./components/RouletteController";
 import { RouletteDisplay } from "./components/RouletteDisplay";
+import { useRoundAnimation } from "./session/useRoundAnimation";
+import { useSessionState } from "./session/useSessionState";
 
 const AdminApp = () => {
-  const [state, setState] = useState<RouletteState | null>(null);
-  const [result, setResult] = useState<RouletteResult | null>(null);
+  const { state: session, connection, refresh: reload } = useSessionState();
 
-  const reload = async () => {
-    const nextState = await fetchState();
-    setState(nextState);
-    setResult(nextState.result);
-  };
-
-  useEffect(() => {
-    reload();
-  }, []);
-
-  useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
-
-    ws.onmessage = (e) => {
-      const incoming = JSON.parse(e.data) as RouletteState;
-      setState(incoming);
-      setResult(incoming.result);
-    };
-
-    return () => ws.close();
-  }, []);
+  // 抽選の演出が続いている間 (自分の抽選でも、ほかの管理画面の抽選でも) だけ、抽選・履歴の削除・リセットを止める。
+  // サーバーは演出を待たないので、これはこの画面だけの規則で、タイマーが終われば必ず戻る
+  const isLocked = useRoundAnimation(session) !== null;
 
   const handleReset = async () => {
-    if (state?.phase === "spinning") return;
-    await resetState();
-    await reload();
+    if (isLocked) return;
+    try {
+      await resetState();
+      reload();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "リセットに失敗しました。");
+    }
   };
 
-  const isLocked = state?.phase === "spinning";
-
-  if (!state) return <p>Loading...</p>;
+  if (!session) return <p>Loading...</p>;
 
   return (
     <div>
       <h1>Roulette Admin</h1>
+      {connection === "connecting" && <p role="status">サーバーに接続しています...</p>}
+      {connection === "lost" && <p role="alert">サーバーとの接続が切れています。再接続しています...</p>}
 
       <OrganizerSettings
-        organizerMode={state.organizer_mode}
-        organizers={state.organizers}
-        selectedOrganizerIndices={state.selected_organizer_indices}
-        disabled={isLocked}
+        organizerMode={session.organizer_mode}
+        organizers={session.organizers}
         onUpdated={reload}
       />
 
       <ParticipantManager
-        participants={state.participants}
-        forcedPlayers={state.forced_players}
-        forcedPlayerTeams={state.forced_player_teams}
-        autoForcedPlayers={state.auto_forced_players}
-        excludedPlayers={state.excluded_players}
-        participationCounts={state.participation_counts}
-        organizerMode={state.organizer_mode}
+        participants={session.participants}
+        forcedLimit={session.settings.forced_limit}
         onUpdated={reload}
       />
 
-      <DrawSettings
-        missThreshold={state.miss_threshold}
-        enableAutoForce={state.enable_auto_force}
-        disabled={isLocked}
-        onUpdated={reload}
-      />
+      <DrawSettings settings={session.settings} onUpdated={reload} />
 
-      <RouletteController
-        organizerMode={state.organizer_mode}
-        organizers={state.organizers}
-        forcedPlayers={state.forced_players}
-        onResult={setResult}
-        onUpdated={reload}
-        disabled={isLocked}
-      />
+      <RouletteController drawOptions={session.draw_options} locked={isLocked} onUpdated={reload} />
       <button onClick={handleReset} disabled={isLocked}>
         リセット
       </button>
 
-      <RouletteDisplay
-        result={result}
-        organizers={state.organizers}
-        organizerMode={state.organizer_mode}
-        selectedOrganizerIndices={state.selected_organizer_indices}
-      />
-      <MatchInfo state={state} />
+      <RouletteDisplay result={session.current_round?.result ?? null} organizers={session.organizers} />
+      <MatchInfo session={session} />
 
-      <HistoryList history={state.history} disabled={isLocked} onUpdated={reload} />
+      <HistoryList history={session.history} disabled={isLocked} onUpdated={reload} />
     </div>
   );
 };
