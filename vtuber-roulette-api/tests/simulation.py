@@ -12,7 +12,8 @@ from typing import Dict, Iterable, List, Sequence
 
 from roulette import logic, router
 from roulette.logic import get_team_slots, state
-from roulette.models import DrawMode, DrawRequest
+from roulette.models import DrawMode
+from roulette.protocol import DrawRequest
 
 HOST_MODES: tuple[DrawMode, ...] = ("hosts_vs_duo", "hosts_split_pairs")
 

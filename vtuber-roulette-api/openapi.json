@@ -6,14 +6,14 @@
   },
   "paths": {
     "/participants": {
-      "post": {
-        "summary": "Set Participants",
-        "operationId": "set_participants_participants_post",
+      "put": {
+        "summary": "Put Participants",
+        "operationId": "put_participants_participants_put",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ParticipantsRequest"
+                "$ref": "#/components/schemas/ReplaceParticipantsRequest"
               }
             }
           },
@@ -41,15 +41,15 @@
         }
       }
     },
-    "/organizer_config": {
+    "/participants/add": {
       "post": {
-        "summary": "Set Organizer Config",
-        "operationId": "set_organizer_config_organizer_config_post",
+        "summary": "Post Participant Add",
+        "operationId": "post_participant_add_participants_add_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OrganizerConfigRequest"
+                "$ref": "#/components/schemas/ParticipantRequest"
               }
             }
           },
@@ -77,15 +77,15 @@
         }
       }
     },
-    "/forced_players": {
+    "/participants/remove": {
       "post": {
-        "summary": "Set Forced Players",
-        "operationId": "set_forced_players_forced_players_post",
+        "summary": "Post Participant Remove",
+        "operationId": "post_participant_remove_participants_remove_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ForcedPlayersRequest"
+                "$ref": "#/components/schemas/ParticipantRequest"
               }
             }
           },
@@ -113,15 +113,123 @@
         }
       }
     },
-    "/excluded_players": {
+    "/participants/forced": {
       "post": {
-        "summary": "Set Excluded Players",
-        "operationId": "set_excluded_players_excluded_players_post",
+        "summary": "Post Participant Forced",
+        "operationId": "post_participant_forced_participants_forced_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExcludedPlayersRequest"
+                "$ref": "#/components/schemas/SetForcedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/participants/excluded": {
+      "post": {
+        "summary": "Post Participant Excluded",
+        "operationId": "post_participant_excluded_participants_excluded_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetExcludedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizers": {
+      "put": {
+        "summary": "Put Organizers",
+        "operationId": "put_organizers_organizers_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOrganizersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings": {
+      "put": {
+        "summary": "Put Settings",
+        "operationId": "put_settings_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSettingsRequest"
               }
             }
           },
@@ -236,42 +344,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/draw_settings": {
-      "post": {
-        "summary": "Set Draw Settings",
-        "operationId": "set_draw_settings_draw_settings_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DrawSettingsRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -465,64 +537,6 @@
         ],
         "title": "DrawRequest"
       },
-      "DrawSettingsRequest": {
-        "properties": {
-          "miss_threshold": {
-            "type": "integer",
-            "title": "Miss Threshold"
-          },
-          "enable_auto_force": {
-            "type": "boolean",
-            "title": "Enable Auto Force"
-          }
-        },
-        "type": "object",
-        "required": [
-          "miss_threshold",
-          "enable_auto_force"
-        ],
-        "title": "DrawSettingsRequest"
-      },
-      "ExcludedPlayersRequest": {
-        "properties": {
-          "excluded_players": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Excluded Players"
-          }
-        },
-        "type": "object",
-        "required": [
-          "excluded_players"
-        ],
-        "title": "ExcludedPlayersRequest"
-      },
-      "ForcedPlayersRequest": {
-        "properties": {
-          "forced_players": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Forced Players"
-          },
-          "forced_player_teams": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Forced Player Teams",
-            "default": {}
-          }
-        },
-        "type": "object",
-        "required": [
-          "forced_players"
-        ],
-        "title": "ForcedPlayersRequest"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -554,40 +568,18 @@
         ],
         "title": "Organizer"
       },
-      "OrganizerConfigRequest": {
+      "ParticipantRequest": {
         "properties": {
-          "organizer_mode": {
+          "name": {
             "type": "string",
-            "enum": [
-              "single",
-              "double"
-            ],
-            "title": "Organizer Mode"
-          },
-          "organizers": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Organizers"
-          },
-          "selected_organizer_indices": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Selected Organizer Indices",
-            "default": [
-              0
-            ]
+            "title": "Name"
           }
         },
         "type": "object",
         "required": [
-          "organizer_mode",
-          "organizers"
+          "name"
         ],
-        "title": "OrganizerConfigRequest"
+        "title": "ParticipantRequest"
       },
       "ParticipantStatus": {
         "properties": {
@@ -644,22 +636,6 @@
         ],
         "title": "ParticipantStatus"
       },
-      "ParticipantsRequest": {
-        "properties": {
-          "participants": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Participants"
-          }
-        },
-        "type": "object",
-        "required": [
-          "participants"
-        ],
-        "title": "ParticipantsRequest"
-      },
       "PresentationCompleteRequest": {
         "properties": {
           "round_id": {
@@ -672,6 +648,22 @@
           "round_id"
         ],
         "title": "PresentationCompleteRequest"
+      },
+      "ReplaceParticipantsRequest": {
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "names"
+        ],
+        "title": "ReplaceParticipantsRequest"
       },
       "ResultTeam": {
         "properties": {
@@ -720,6 +712,49 @@
           "teams"
         ],
         "title": "RouletteResult"
+      },
+      "SaveOrganizersRequest": {
+        "properties": {
+          "organizer_mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "title": "Organizer Mode"
+          },
+          "organizers": {
+            "items": {
+              "$ref": "#/components/schemas/Organizer"
+            },
+            "type": "array",
+            "title": "Organizers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organizer_mode",
+          "organizers"
+        ],
+        "title": "SaveOrganizersRequest"
+      },
+      "SaveSettingsRequest": {
+        "properties": {
+          "miss_threshold": {
+            "type": "integer",
+            "title": "Miss Threshold"
+          },
+          "enable_auto_force": {
+            "type": "boolean",
+            "title": "Enable Auto Force"
+          }
+        },
+        "type": "object",
+        "required": [
+          "miss_threshold",
+          "enable_auto_force"
+        ],
+        "title": "SaveSettingsRequest"
       },
       "SelectionGroup": {
         "properties": {
@@ -830,6 +865,54 @@
           "history"
         ],
         "title": "SessionState"
+      },
+      "SetExcludedRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "excluded"
+        ],
+        "title": "SetExcludedRequest"
+      },
+      "SetForcedRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "forced": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "A",
+                  "B"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forced"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "forced"
+        ],
+        "title": "SetForcedRequest"
       },
       "Settings": {
         "properties": {

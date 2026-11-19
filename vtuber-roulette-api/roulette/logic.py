@@ -10,7 +10,7 @@ from draw_config import (
     AUTO_FORCE_MAX_PER_DRAW,
     AUTO_FORCE_MEDIAN_GAP,
 )
-from .models import DrawMode, DrawRecord, ResultTeam, RouletteResult, RouletteState
+from .models import DrawMode, DrawRecord, OrganizerMode, ResultTeam, RouletteResult, RouletteState
 
 # ── グローバル状態 ─────────────────────────────────────────────────────────────
 
@@ -61,6 +61,89 @@ def get_team_slots(mode: DrawMode) -> tuple[int, int]:
         return 0, 2
     # hosts_split_pairs
     return 1, 1
+
+
+# ── 操作 ─────────────────────────────────────────────────────────────────────
+# 画面からの操作で状態を変える。入力の検証 (存在しない名前など) は router が行う。
+
+
+class ForcedLimitError(Exception):
+    """手動強制の人数が上限を超える。"""
+
+
+def _drop_records_of_non_participants() -> None:
+    """参加者でなくなった人 (と主催) の強制・除外・前回参加などの記録を消す。"""
+    organizers = organizer_set()
+
+    def keep(names: List[str]) -> List[str]:
+        return [p for p in names if p in state.participants and p not in organizers]
+
+    state.forced_players = keep(state.forced_players)[:forced_players_limit()]
+    state.forced_player_teams = {p: state.forced_player_teams.get(p, "none") for p in state.forced_players}
+    state.excluded_players = keep(state.excluded_players)
+    state.last_players = keep(state.last_players)
+    state.prev_players = keep(state.prev_players)
+    state.spin_order = keep(state.spin_order)
+    state.miss_counts = {p: state.miss_counts.get(p, 0) for p in state.participants}
+    state.participation_counts = {p: state.participation_counts.get(p, 0) for p in state.participants}
+    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+
+
+def replace_participants(names: List[str]) -> None:
+    state.participants = sanitize_names(names, limit=1000)
+    _drop_records_of_non_participants()
+
+
+def add_participant(name: str) -> None:
+    replace_participants(state.participants + [name])
+
+
+def remove_participant(name: str) -> None:
+    replace_participants([p for p in state.participants if p != name])
+
+
+def set_forced(name: str, team: str | None) -> None:
+    """name の手動強制を設定する。team は "none" (チーム指定なし) / "A" / "B"、None で解除。"""
+    if name in organizer_set():
+        return
+    if team is None:
+        state.forced_players = [p for p in state.forced_players if p != name]
+        state.forced_player_teams.pop(name, None)
+    else:
+        if name not in state.forced_players:
+            if len(state.forced_players) >= forced_players_limit():
+                raise ForcedLimitError(f"手動強制は最大{forced_players_limit()}人までです")
+            state.forced_players = state.forced_players + [name]
+        state.forced_player_teams = {**state.forced_player_teams, name: team}
+    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+
+
+def set_excluded(name: str, excluded: bool) -> None:
+    if name in organizer_set():
+        return
+    others = [p for p in state.excluded_players if p != name]
+    state.excluded_players = others + [name] if excluded else others
+    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+
+
+def configure_organizers(mode: OrganizerMode, names: List[str], active: List[str]) -> None:
+    """主催の候補 (並び順どおり) と、そのうち主催として選ぶ人を設定する。"""
+    state.organizer_mode = mode
+    state.organizers = sanitize_names(names, limit=10)
+    selected = [state.organizers.index(n) for n in sanitize_names(active, limit=10) if n in state.organizers]
+    state.selected_organizer_indices = sorted(selected)[: 2 if mode == "double" else 1]
+
+    organizers = organizer_set()
+    state.forced_players = [p for p in state.forced_players if p not in organizers][:forced_players_limit()]
+    state.forced_player_teams = {p: state.forced_player_teams.get(p, "none") for p in state.forced_players}
+    state.excluded_players = [p for p in state.excluded_players if p not in organizers]
+    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+
+
+def save_settings(miss_threshold: int, enable_auto_force: bool) -> None:
+    state.miss_threshold = miss_threshold
+    state.enable_auto_force = enable_auto_force
+    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
 
 
 # ── 抽選ロジック ───────────────────────────────────────────────────────────────

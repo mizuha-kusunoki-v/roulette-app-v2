@@ -48,37 +48,3 @@ class RouletteState(BaseModel):
     round_id: str | None = None
     phase: Literal["idle", "spinning", "result"] = "idle"
     history: List[DrawRecord] = []
-
-
-# ── リクエストモデル ──────────────────────────────────────────────────────────
-
-class ParticipantsRequest(BaseModel):
-    participants: List[str]
-
-
-class OrganizerConfigRequest(BaseModel):
-    organizer_mode: OrganizerMode
-    organizers: List[str]
-    selected_organizer_indices: List[int] = [0]
-
-
-class ForcedPlayersRequest(BaseModel):
-    forced_players: List[str]
-    forced_player_teams: Dict[str, str] = {}
-
-
-class ExcludedPlayersRequest(BaseModel):
-    excluded_players: List[str]
-
-
-class DrawRequest(BaseModel):
-    mode: DrawMode
-
-
-class PresentationCompleteRequest(BaseModel):
-    round_id: str
-
-
-class DrawSettingsRequest(BaseModel):
-    miss_threshold: int
-    enable_auto_force: bool

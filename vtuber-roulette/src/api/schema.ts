@@ -12,16 +12,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
-        /** Set Participants */
-        post: operations["set_participants_participants_post"];
+        /** Put Participants */
+        put: operations["put_participants_participants_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/organizer_config": {
+    "/participants/add": {
         parameters: {
             query?: never;
             header?: never;
@@ -30,15 +30,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Set Organizer Config */
-        post: operations["set_organizer_config_organizer_config_post"];
+        /** Post Participant Add */
+        post: operations["post_participant_add_participants_add_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/forced_players": {
+    "/participants/remove": {
         parameters: {
             query?: never;
             header?: never;
@@ -47,15 +47,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Set Forced Players */
-        post: operations["set_forced_players_forced_players_post"];
+        /** Post Participant Remove */
+        post: operations["post_participant_remove_participants_remove_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/excluded_players": {
+    "/participants/forced": {
         parameters: {
             query?: never;
             header?: never;
@@ -64,8 +64,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Set Excluded Players */
-        post: operations["set_excluded_players_excluded_players_post"];
+        /** Post Participant Forced */
+        post: operations["post_participant_forced_participants_forced_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/participants/excluded": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Participant Excluded */
+        post: operations["post_participant_excluded_participants_excluded_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Organizers */
+        put: operations["put_organizers_organizers_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Settings */
+        put: operations["put_settings_settings_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -118,23 +169,6 @@ export interface paths {
         post?: never;
         /** Delete History */
         delete: operations["delete_history_history__round_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/draw_settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Set Draw Settings */
-        post: operations["set_draw_settings_draw_settings_post"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -227,30 +261,6 @@ export interface components {
              */
             mode: "standard_3" | "standard_4" | "hosts_vs_duo" | "hosts_split_pairs";
         };
-        /** DrawSettingsRequest */
-        DrawSettingsRequest: {
-            /** Miss Threshold */
-            miss_threshold: number;
-            /** Enable Auto Force */
-            enable_auto_force: boolean;
-        };
-        /** ExcludedPlayersRequest */
-        ExcludedPlayersRequest: {
-            /** Excluded Players */
-            excluded_players: string[];
-        };
-        /** ForcedPlayersRequest */
-        ForcedPlayersRequest: {
-            /** Forced Players */
-            forced_players: string[];
-            /**
-             * Forced Player Teams
-             * @default {}
-             */
-            forced_player_teams: {
-                [key: string]: string;
-            };
-        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -263,22 +273,10 @@ export interface components {
             /** Active */
             active: boolean;
         };
-        /** OrganizerConfigRequest */
-        OrganizerConfigRequest: {
-            /**
-             * Organizer Mode
-             * @enum {string}
-             */
-            organizer_mode: "single" | "double";
-            /** Organizers */
-            organizers: string[];
-            /**
-             * Selected Organizer Indices
-             * @default [
-             *       0
-             *     ]
-             */
-            selected_organizer_indices: number[];
+        /** ParticipantRequest */
+        ParticipantRequest: {
+            /** Name */
+            name: string;
         };
         /** ParticipantStatus */
         ParticipantStatus: {
@@ -297,15 +295,15 @@ export interface components {
             /** Due */
             due: boolean;
         };
-        /** ParticipantsRequest */
-        ParticipantsRequest: {
-            /** Participants */
-            participants: string[];
-        };
         /** PresentationCompleteRequest */
         PresentationCompleteRequest: {
             /** Round Id */
             round_id: string;
+        };
+        /** ReplaceParticipantsRequest */
+        ReplaceParticipantsRequest: {
+            /** Names */
+            names: string[];
         };
         /** ResultTeam */
         ResultTeam: {
@@ -323,6 +321,23 @@ export interface components {
             kind: "standard_3" | "standard_4" | "hosts_vs_duo" | "hosts_split_pairs";
             /** Teams */
             teams: components["schemas"]["ResultTeam"][];
+        };
+        /** SaveOrganizersRequest */
+        SaveOrganizersRequest: {
+            /**
+             * Organizer Mode
+             * @enum {string}
+             */
+            organizer_mode: "single" | "double";
+            /** Organizers */
+            organizers: components["schemas"]["Organizer"][];
+        };
+        /** SaveSettingsRequest */
+        SaveSettingsRequest: {
+            /** Miss Threshold */
+            miss_threshold: number;
+            /** Enable Auto Force */
+            enable_auto_force: boolean;
         };
         /** SelectionGroup */
         SelectionGroup: {
@@ -359,6 +374,20 @@ export interface components {
             /** History */
             history: components["schemas"]["DrawRecord"][];
         };
+        /** SetExcludedRequest */
+        SetExcludedRequest: {
+            /** Name */
+            name: string;
+            /** Excluded */
+            excluded: boolean;
+        };
+        /** SetForcedRequest */
+        SetForcedRequest: {
+            /** Name */
+            name: string;
+            /** Forced */
+            forced: ("any" | "A" | "B") | null;
+        };
         /** Settings */
         Settings: {
             /** Miss Threshold */
@@ -390,7 +419,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    set_participants_participants_post: {
+    put_participants_participants_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -399,7 +428,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ParticipantsRequest"];
+                "application/json": components["schemas"]["ReplaceParticipantsRequest"];
             };
         };
         responses: {
@@ -423,7 +452,7 @@ export interface operations {
             };
         };
     };
-    set_organizer_config_organizer_config_post: {
+    post_participant_add_participants_add_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -432,7 +461,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["OrganizerConfigRequest"];
+                "application/json": components["schemas"]["ParticipantRequest"];
             };
         };
         responses: {
@@ -456,7 +485,7 @@ export interface operations {
             };
         };
     };
-    set_forced_players_forced_players_post: {
+    post_participant_remove_participants_remove_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -465,7 +494,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ForcedPlayersRequest"];
+                "application/json": components["schemas"]["ParticipantRequest"];
             };
         };
         responses: {
@@ -489,7 +518,7 @@ export interface operations {
             };
         };
     };
-    set_excluded_players_excluded_players_post: {
+    post_participant_forced_participants_forced_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -498,7 +527,106 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExcludedPlayersRequest"];
+                "application/json": components["schemas"]["SetForcedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_participant_excluded_participants_excluded_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetExcludedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_organizers_organizers_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveOrganizersRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveSettingsRequest"];
             };
         };
         responses: {
@@ -598,39 +726,6 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_draw_settings_draw_settings_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DrawSettingsRequest"];
-            };
-        };
         responses: {
             /** @description Successful Response */
             200: {

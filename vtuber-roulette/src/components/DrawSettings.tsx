@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { updateDrawSettings } from "../api/client";
+import { saveSettings } from "../api/client";
 import { SessionState } from "../types";
 
 interface Props {
@@ -16,7 +16,7 @@ export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
   useEffect(() => { setAutoForce(settings.enable_auto_force); }, [settings.enable_auto_force]);
 
   const save = async () => {
-    await updateDrawSettings(threshold, autoForce);
+    await saveSettings(threshold, autoForce);
     await onUpdated();
   };
 

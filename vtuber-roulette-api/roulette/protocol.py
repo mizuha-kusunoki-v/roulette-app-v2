@@ -1,4 +1,4 @@
-"""フロントとバックエンドの間のプロトコル (サーバーから送る状態のメッセージの形)。
+"""フロントとバックエンドの間のプロトコル (サーバーから送る状態と、画面から送る操作のメッセージの形)。
 
 ここにはメッセージの形だけを置き、内部の状態や抽選のルールには依存しない。
 内部の状態からこの形を組み立てるのは snapshot.py、ルールから導く値の計算は logic.py が受け持つ。
@@ -65,3 +65,43 @@ class SessionState(BaseModel):
     current_round: CurrentRound | None
     previous_round_players: List[str]  # 最新の回の 1 つ前の回に出た人 (管理画面の「前回参加者」)
     history: List[DrawRecord]
+
+
+# ── 画面から送る操作 ─────────────────────────────────────────────────────────
+# 参加者の名前は URL に入れず本文で送る (名前に "/" が入るとパスとして解釈されるため)
+
+
+class ReplaceParticipantsRequest(BaseModel):
+    names: List[str]
+
+
+class ParticipantRequest(BaseModel):
+    name: str
+
+
+class SetForcedRequest(BaseModel):
+    name: str
+    forced: ForcedTeam | None  # None で解除
+
+
+class SetExcludedRequest(BaseModel):
+    name: str
+    excluded: bool
+
+
+class SaveOrganizersRequest(BaseModel):
+    organizer_mode: OrganizerMode
+    organizers: List[Organizer]  # 並び順を保つ。active は主催モードの人数まで有効
+
+
+class SaveSettingsRequest(BaseModel):
+    miss_threshold: int
+    enable_auto_force: bool
+
+
+class DrawRequest(BaseModel):
+    mode: DrawMode
+
+
+class PresentationCompleteRequest(BaseModel):
+    round_id: str

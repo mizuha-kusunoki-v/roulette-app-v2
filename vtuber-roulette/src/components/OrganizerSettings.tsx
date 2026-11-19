@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { updateOrganizerConfig } from "../api/client";
+import { saveOrganizers } from "../api/client";
 import { Organizer, OrganizerMode } from "../types";
 
 const MAX_ORGANIZERS = 10;
@@ -65,7 +65,10 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
   };
 
   const save = async () => {
-    await updateOrganizerConfig(mode, hosts, selectedIndices);
+    await saveOrganizers(
+      mode,
+      hosts.map((name, i) => ({ name, active: selectedIndices.includes(i) })),
+    );
     await onUpdated();
   };
 

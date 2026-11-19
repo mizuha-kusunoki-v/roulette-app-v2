@@ -153,17 +153,21 @@ AUTO_FORCE_MAX_PER_DRAW = 2
 
 | メソッド | パス | 内容 |
 |---|---|---|
-| POST | `/participants` | 参加者リストを更新 |
-| POST | `/organizer_config` | 主催設定を更新 |
-| POST | `/forced_players` | 手動強制プレイヤーを設定 |
-| POST | `/excluded_players` | 除外プレイヤーを設定 |
-| POST | `/draw_settings` | 抽選設定（ミス閾値等）を変更 |
+| GET | `/session` | セッションの状態（プロトコル）を取得 |
+| WS | `/ws/session` | セッションの状態を、接続時と変化時に送る |
+| PUT | `/participants` | 参加者リストを置き換える（CSV 取り込み） |
+| POST | `/participants/add` | 参加者を1人追加 |
+| POST | `/participants/remove` | 参加者を1人削除 |
+| POST | `/participants/forced` | 手動強制の設定・チーム指定・解除 |
+| POST | `/participants/excluded` | 除外の切り替え |
+| PUT | `/organizers` | 主催モードと主催（候補と選択）を保存 |
+| PUT | `/settings` | 抽選設定（救済閾値・自動強制）を保存 |
 | POST | `/draw` | 抽選を実行 |
 | POST | `/presentation_complete` | スロット演出完了を通知 |
 | DELETE | `/history/{round_id}` | 指定した抽選履歴を削除 |
 | POST | `/reset` | 全状態をリセット |
-| GET | `/session` | セッションの状態（プロトコル）を取得 |
-| WS | `/ws/session` | セッションの状態を、接続時と変化時に送る |
+
+参加者の名前は URL に入れず、本文（JSON）で送ります。名前に「/」が入るとパスとして解釈されるためです。
 
 ---
 

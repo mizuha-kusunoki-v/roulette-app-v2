@@ -7,29 +7,34 @@ from pydantic import BaseModel
 
 from .changes import state_changes
 from .logic import (
+    ForcedLimitError,
+    add_participant,
     apply_draw_result,
     build_result,
-    compute_auto_forced_players,
     compute_matchup_key,
+    configure_organizers,
     delete_history_record,
     draw_blocker,
-    forced_players_limit,
-    organizer_set,
+    remove_participant,
+    replace_participants,
     reset_state,
-    sanitize_names,
+    save_settings,
     select_players,
+    set_excluded,
+    set_forced,
     state,
 )
-from .models import (
+from .protocol import (
     DrawRequest,
-    DrawSettingsRequest,
-    ExcludedPlayersRequest,
-    ForcedPlayersRequest,
-    OrganizerConfigRequest,
-    ParticipantsRequest,
+    ParticipantRequest,
     PresentationCompleteRequest,
+    ReplaceParticipantsRequest,
+    SaveOrganizersRequest,
+    SaveSettingsRequest,
+    SessionState,
+    SetExcludedRequest,
+    SetForcedRequest,
 )
-from .protocol import SessionState
 from .snapshot import build_session_state
 
 _PAIR_RETRY_MAX = 10
@@ -37,88 +42,69 @@ _PAIR_RETRY_MAX = 10
 router = APIRouter()
 
 
-def _clean_forced_player_teams() -> None:
-    """forced_players に含まれないプレイヤーの team 情報を削除する。"""
-    state.forced_player_teams = {
-        p: state.forced_player_teams.get(p, "none")
-        for p in state.forced_players
-    }
+def _require_participant(name: str) -> None:
+    if name not in state.participants:
+        raise HTTPException(status_code=404, detail=f"参加者「{name}」が見つかりません")
 
 
-@router.post("/participants")
-def set_participants(req: ParticipantsRequest):
-    state.participants = sanitize_names(req.participants, limit=1000)
-    organizers = organizer_set()
-
-    state.forced_players = [
-        p for p in state.forced_players if p in state.participants and p not in organizers
-    ][:forced_players_limit()]
-    _clean_forced_player_teams()
-    state.excluded_players = [
-        p for p in state.excluded_players if p in state.participants and p not in organizers
-    ]
-    state.last_players = [
-        p for p in state.last_players if p in state.participants and p not in organizers
-    ]
-    state.prev_players = [
-        p for p in state.prev_players if p in state.participants and p not in organizers
-    ]
-    state.spin_order = [
-        p for p in state.spin_order if p in state.participants and p not in organizers
-    ]
-    state.miss_counts = {p: state.miss_counts.get(p, 0) for p in state.participants}
-    state.participation_counts = {
-        p: state.participation_counts.get(p, 0) for p in state.participants
-    }
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
-
+@router.put("/participants")
+def put_participants(req: ReplaceParticipantsRequest):
+    replace_participants(req.names)
     return {"ok": True}
 
 
-@router.post("/organizer_config")
-def set_organizer_config(req: OrganizerConfigRequest):
-    state.organizer_mode = req.organizer_mode
-    state.organizers = sanitize_names(req.organizers, limit=10)
-
-    valid_indices = [i for i in req.selected_organizer_indices if 0 <= i < len(state.organizers)]
-    limit = 2 if req.organizer_mode == "double" else 1
-    state.selected_organizer_indices = valid_indices[:limit]
-
-    organizers = organizer_set()
-    state.forced_players = [p for p in state.forced_players if p not in organizers][:forced_players_limit()]
-    _clean_forced_player_teams()
-    state.excluded_players = [p for p in state.excluded_players if p not in organizers]
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+@router.post("/participants/add")
+def post_participant_add(req: ParticipantRequest):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="参加者名を入力してください")
+    if name in state.participants:
+        raise HTTPException(status_code=409, detail=f"参加者「{name}」はすでにいます")
+    add_participant(name)
     return {"ok": True}
 
 
-@router.post("/forced_players")
-def set_forced_players(req: ForcedPlayersRequest):
-    unique = []
-    organizers = organizer_set()
-    for player in req.forced_players:
-        if player in state.participants and player not in organizers and player not in unique:
-            unique.append(player)
-
-    state.forced_players = unique[:forced_players_limit()]
-    state.forced_player_teams = {
-        p: req.forced_player_teams.get(p, "none")
-        for p in state.forced_players
-    }
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+@router.post("/participants/remove")
+def post_participant_remove(req: ParticipantRequest):
+    _require_participant(req.name)
+    remove_participant(req.name)
     return {"ok": True}
 
 
-@router.post("/excluded_players")
-def set_excluded_players(req: ExcludedPlayersRequest):
-    unique = []
-    organizers = organizer_set()
-    for player in req.excluded_players:
-        if player in state.participants and player not in organizers and player not in unique:
-            unique.append(player)
+@router.post("/participants/forced")
+def post_participant_forced(req: SetForcedRequest):
+    _require_participant(req.name)
+    # プロトコルではチーム指定なしを "any"、内部では "none" で持つ
+    team = None if req.forced is None else ("none" if req.forced == "any" else req.forced)
+    try:
+        set_forced(req.name, team)
+    except ForcedLimitError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
 
-    state.excluded_players = unique
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+
+@router.post("/participants/excluded")
+def post_participant_excluded(req: SetExcludedRequest):
+    _require_participant(req.name)
+    set_excluded(req.name, req.excluded)
+    return {"ok": True}
+
+
+@router.put("/organizers")
+def put_organizers(req: SaveOrganizersRequest):
+    configure_organizers(
+        req.organizer_mode,
+        [o.name for o in req.organizers],
+        [o.name for o in req.organizers if o.active],
+    )
+    return {"ok": True}
+
+
+@router.put("/settings")
+def put_settings(req: SaveSettingsRequest):
+    if req.miss_threshold < 1:
+        raise HTTPException(status_code=400, detail="救済閾値は1以上にしてください")
+    save_settings(req.miss_threshold, req.enable_auto_force)
     return {"ok": True}
 
 
@@ -156,16 +142,6 @@ def delete_history(round_id: str):
         raise HTTPException(status_code=400, detail="抽選演出中は削除できません")
     if not delete_history_record(round_id):
         raise HTTPException(status_code=404, detail="指定した抽選結果が見つかりません")
-    return {"ok": True}
-
-
-@router.post("/draw_settings")
-def set_draw_settings(req: DrawSettingsRequest):
-    if req.miss_threshold < 1:
-        raise HTTPException(status_code=400, detail="miss_threshold must be at least 1")
-    state.miss_threshold = req.miss_threshold
-    state.enable_auto_force = req.enable_auto_force
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
     return {"ok": True}
 
 
