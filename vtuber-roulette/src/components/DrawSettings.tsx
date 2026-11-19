@@ -1,27 +1,20 @@
 import { useEffect, useState } from "react";
-import { updateDrawSettings } from "../api/client";
+import { saveSettings } from "../api/client";
+import { SessionState } from "../types";
 
 interface Props {
-  missThreshold: number;
-  enableAutoForce: boolean;
+  settings: SessionState["settings"];
   disabled: boolean;
   onUpdated: () => void;
 }
 
-export const DrawSettings = ({
-  missThreshold,
-  enableAutoForce,
-  disabled,
-  onUpdated,
-}: Props) => {
-  const [threshold, setThreshold] = useState(missThreshold);
-  const [autoForce, setAutoForce] = useState(enableAutoForce);
+export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
+  const [autoForce, setAutoForce] = useState(settings.enable_auto_force);
 
-  useEffect(() => { setThreshold(missThreshold); }, [missThreshold]);
-  useEffect(() => { setAutoForce(enableAutoForce); }, [enableAutoForce]);
+  useEffect(() => { setAutoForce(settings.enable_auto_force); }, [settings.enable_auto_force]);
 
   const save = async () => {
-    await updateDrawSettings(threshold, autoForce);
+    await saveSettings(autoForce);
     await onUpdated();
   };
 
@@ -30,25 +23,6 @@ export const DrawSettings = ({
       <h2>抽選設定</h2>
 
       <div>
-        <label>
-          連続未抽選の救済閾値：
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={threshold}
-            onChange={(e) => setThreshold(Math.max(1, Number(e.target.value)))}
-            disabled={disabled}
-            style={{ width: 60, marginLeft: 8 }}
-          />
-          回
-        </label>
-        <p style={{ fontSize: 13, margin: "4px 0 0" }}>
-          この回数連続で抽選されなかった参加者を優先選出します。
-        </p>
-      </div>
-
-      <div style={{ marginTop: 12 }}>
         <label>
           <input
             type="checkbox"

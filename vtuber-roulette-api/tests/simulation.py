@@ -1,0 +1,131 @@
+"""抽選ロジックの評価用シミュレーションと評価関数。
+
+抽選は API と同じ入口 (router.draw) から呼ぶので、集計の更新も含めて評価できる。
+状態は操作 (logic の操作関数) で作り、結果は tests/harness.py を通して名前で読む。
+状態はモジュールのグローバルなので、各テストの前に conftest がリセットする。
+"""
+
+import math
+import statistics
+from collections import Counter
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Sequence
+
+from roulette import router
+from roulette.logic import get_team_slots
+from roulette.models import DrawMode
+from roulette.protocol import DrawRequest
+from tests import harness
+
+from tests.builders import SessionBuilder
+
+
+def setup_session(
+    n: int,
+    mode: DrawMode = "standard_4",
+    *,
+    auto_force: bool = False,
+    excluded: Sequence[str] = (),
+    forced: Sequence[str] = (),
+    forced_teams: Dict[str, str] | None = None,
+) -> None:
+    """n 人の参加者で抽選できる状態を作り、このテストのアプリに置く。主催はモードに合わせて置く。
+
+    forced_teams は "none" (チーム指定なし) / "A" / "B"。細かい状態が要るときは SessionBuilder を直接使う。
+    """
+    builder = (
+        SessionBuilder()
+        .participants(n)
+        .organizers_for(mode)
+        .settings(auto_force=auto_force)
+        .excluded(*excluded)
+    )
+    teams = forced_teams or {}
+    for p in forced:
+        builder.forced(p, teams.get(p, "none"))
+    harness.use(builder.build())
+
+
+def slots(mode: DrawMode) -> int:
+    a, b = get_team_slots(mode)
+    return a + b
+
+
+@dataclass
+class Round:
+    """1 回の抽選の前後の情報。評価関数はこれの列を受け取る。"""
+
+    before: harness.Before
+    selected: List[str]  # [チームA..., チームB...] の順
+    team_a: List[str]
+    team_b: List[str]
+    reasons: Dict[str, str]
+
+
+def draw(mode: DrawMode) -> Round:
+    before = harness.before()
+    router.draw(DrawRequest(mode=mode), harness.session())
+    a_slots, _ = get_team_slots(mode)
+    record = harness.latest_record()
+    return Round(
+        before=before,
+        selected=record.selected,
+        team_a=record.selected[:a_slots],
+        team_b=record.selected[a_slots:],
+        reasons=record.reasons,
+    )
+
+
+def run(mode: DrawMode, rounds: int) -> List[Round]:
+    return [draw(mode) for _ in range(rounds)]
+
+
+# ── 評価関数 ──────────────────────────────────────────────────────────────────
+
+
+def max_miss_streak(history: Iterable[Round], candidates: Sequence[str]) -> int:
+    """candidates の誰かが連続で外れた回数の最大値。"""
+    streak = {p: 0 for p in candidates}
+    worst = 0
+    for r in history:
+        for p in candidates:
+            streak[p] = 0 if p in r.selected else streak[p] + 1
+            worst = max(worst, streak[p])
+    return worst
+
+
+def worst_median_gap(history: Iterable[Round], candidates: Sequence[str]) -> float:
+    """各抽選の後で「参加回数の中央値 - 最小値」が最も開いたときの値。"""
+    counts = {p: 0 for p in candidates}
+    worst = 0.0
+    for r in history:
+        for p in r.selected:
+            if p in counts:
+                counts[p] += 1
+        values = list(counts.values())
+        worst = max(worst, statistics.median(values) - min(values))
+    return worst
+
+
+def matchup_repeat_sd() -> float:
+    """同じ対戦カードが出た回数のばらつき (標準偏差)。小さいほど偏りが少ない。"""
+    return statistics.pstdev(Counter(harness.pair_counts()).values())
+
+
+def fair_wait_bound(n_candidates: int, mode: DrawMode) -> int:
+    """連続で外れる回数の上限の目安。
+
+    全員を順番に回すと ceil(n / 枠) 回に 1 回は出番が来る。一番長く外れている人は 1 人ずつしか確定で入らないので、
+    同じ回数で並んだ人がいると 1 回分遅れることがある。その 1 回分を足す。
+    """
+    return math.ceil(n_candidates / slots(mode)) + 1
+
+
+@dataclass
+class Scenario:
+    n: int
+    mode: DrawMode
+    auto_force: bool = False
+    excluded: List[str] = field(default_factory=list)
+    forced: List[str] = field(default_factory=list)
+    forced_teams: Dict[str, str] = field(default_factory=dict)

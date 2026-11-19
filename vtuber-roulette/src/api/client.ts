@@ -1,6 +1,8 @@
-import { DrawMode, OrganizerMode, RouletteState } from "../types";
+import type { components } from "./schema";
+import { DrawMode, ForcedTeam, Organizer, OrganizerMode, SessionState } from "../types";
+import { apiUrl } from "./endpoint";
 
-const BASE_URL = "http://localhost:8000";
+type Schemas = components["schemas"];
 
 async function ensureOk(res: Response) {
   if (res.ok) return;
@@ -15,99 +17,55 @@ async function ensureOk(res: Response) {
   throw new Error(message);
 }
 
-export async function fetchState(): Promise<RouletteState> {
-  const res = await fetch(`${BASE_URL}/state`);
+// 本文の型は OpenAPI から生成した型に合わせる。形がずれると型チェックで失敗する
+async function send<T>(method: "POST" | "PUT", path: string, body: T) {
+  const res = await fetch(apiUrl(path), {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  await ensureOk(res);
+}
+
+export async function fetchSession(): Promise<SessionState> {
+  const res = await fetch(apiUrl("/session"));
   await ensureOk(res);
   return res.json();
 }
 
-export async function updateParticipants(participants: string[]) {
-  const res = await fetch(`${BASE_URL}/participants`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ participants }),
-  });
-  await ensureOk(res);
-}
+export const replaceParticipants = (names: string[]) =>
+  send<Schemas["ReplaceParticipantsRequest"]>("PUT", "/participants", { names });
 
-export async function updateOrganizerConfig(
-  organizerMode: OrganizerMode,
-  organizers: string[],
-  selectedOrganizerIndices: number[],
-) {
-  const res = await fetch(`${BASE_URL}/organizer_config`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      organizer_mode: organizerMode,
-      organizers,
-      selected_organizer_indices: selectedOrganizerIndices,
-    }),
-  });
-  await ensureOk(res);
-}
+export const addParticipant = (name: string) =>
+  send<Schemas["ParticipantRequest"]>("POST", "/participants/add", { name });
 
-export async function updateForcedPlayers(
-  forcedPlayers: string[],
-  forcedPlayerTeams: Record<string, "none" | "A" | "B"> = {},
-) {
-  const res = await fetch(`${BASE_URL}/forced_players`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ forced_players: forcedPlayers, forced_player_teams: forcedPlayerTeams }),
-  });
-  await ensureOk(res);
-}
+export const removeParticipant = (name: string) =>
+  send<Schemas["ParticipantRequest"]>("POST", "/participants/remove", { name });
 
-export async function updateExcludedPlayers(excludedPlayers: string[]) {
-  const res = await fetch(`${BASE_URL}/excluded_players`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ excluded_players: excludedPlayers }),
-  });
-  await ensureOk(res);
-}
+export const setForced = (name: string, forced: ForcedTeam | null) =>
+  send<Schemas["SetForcedRequest"]>("POST", "/participants/forced", { name, forced });
 
-export async function draw(mode: DrawMode) {
-  const res = await fetch(`${BASE_URL}/draw`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode }),
-  });
-  await ensureOk(res);
+export const setExcluded = (name: string, excluded: boolean) =>
+  send<Schemas["SetExcludedRequest"]>("POST", "/participants/excluded", { name, excluded });
 
-  const data = await res.json();
-  return data.result;
-}
+export const saveOrganizers = (organizerMode: OrganizerMode, organizers: Organizer[]) =>
+  send<Schemas["SaveOrganizersRequest"]>("PUT", "/organizers", { organizer_mode: organizerMode, organizers });
 
-export async function updateDrawSettings(missThreshold: number, enableAutoForce: boolean) {
-  const res = await fetch(`${BASE_URL}/draw_settings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ miss_threshold: missThreshold, enable_auto_force: enableAutoForce }),
-  });
-  await ensureOk(res);
-}
+export const saveSettings = (enableAutoForce: boolean) =>
+  send<Schemas["SaveSettingsRequest"]>("PUT", "/settings", { enable_auto_force: enableAutoForce });
 
-export async function notifyPresentationComplete(roundId: string) {
-  const res = await fetch(`${BASE_URL}/presentation_complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ round_id: roundId }),
-  });
-  await ensureOk(res);
-}
+export const draw = (mode: DrawMode) => send<Schemas["DrawRequest"]>("POST", "/draw", { mode });
+
+export const notifyPresentationComplete = (roundId: string) =>
+  send<Schemas["PresentationCompleteRequest"]>("POST", "/presentation_complete", { round_id: roundId });
 
 export async function resetState() {
-  const res = await fetch(`${BASE_URL}/reset`, {
-    method: "POST",
-  });
+  const res = await fetch(apiUrl("/reset"), { method: "POST" });
   await ensureOk(res);
 }
 
-
 export async function deleteHistoryRecord(roundId: string) {
-  const res = await fetch(`${BASE_URL}/history/${encodeURIComponent(roundId)}`, {
+  const res = await fetch(apiUrl(`/history/${encodeURIComponent(roundId)}`), {
     method: "DELETE",
   });
   await ensureOk(res);

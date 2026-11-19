@@ -1,25 +1,16 @@
-import { OrganizerMode, RouletteResult } from "../types";
+import { Organizer, RouletteResult } from "../types";
 import { getDisplayTeams } from "../utils/resultDisplay";
 
 export const RouletteDisplay = ({
   result,
-  organizers = [],
-  organizerMode = "single",
-  selectedOrganizerIndices = [0],
+  organizers,
 }: {
   result: RouletteResult | null;
-  organizers?: string[];
-  organizerMode?: OrganizerMode;
-  selectedOrganizerIndices?: number[];
+  organizers: Organizer[];
 }) => {
   if (!result) return <p>抽選結果はまだありません。</p>;
 
-  const teams = getDisplayTeams(
-    result,
-    organizers,
-    organizerMode,
-    selectedOrganizerIndices,
-  );
+  const teams = getDisplayTeams(result, organizers);
 
   return (
     <div>

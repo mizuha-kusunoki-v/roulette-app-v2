@@ -1,68 +1,51 @@
-import { RouletteState } from "../types";
-import { getActiveOrganizers } from "../utils/resultDisplay";
+import { SelectionReason, SessionState } from "../types";
+import { activeOrganizerNames } from "../utils/resultDisplay";
 
-const REASON_LABEL: Record<string, string> = {
+// 理由が増えたら、ここに書かないと型チェックで失敗する
+const REASON_LABEL: Record<SelectionReason, string> = {
   manual_check: "手動強制",
-  miss_3: `連続未選出救済`,
+  miss_3: "連続未選出救済",
   median_gap: "中央値差による救済",
   random: "ランダム抽選",
   exception_prev_round: "前回参加者からの例外補充",
 };
 
-export const MatchInfo = ({ state }: { state: RouletteState }) => {
-  const guaranteed = Object.entries(state.miss_counts)
-    .filter(([_, count]) => count >= state.miss_threshold)
-    .map(([name]) => name);
+const names = (list: string[]) => (list.length ? list.join(", ") : "なし");
 
-  const grouped = Object.entries(state.last_selection_reasons).reduce(
-    (acc, [name, reason]) => {
-      if (!acc[reason]) acc[reason] = [];
-      acc[reason].push(name);
-      return acc;
-    },
-    {} as Record<string, string[]>
-  );
-
-  const activeOrganizers = getActiveOrganizers(
-    state.organizer_mode,
-    state.organizers,
-    state.selected_organizer_indices,
-  );
+export const MatchInfo = ({ session }: { session: SessionState }) => {
+  const active = activeOrganizerNames(session.organizers);
+  const due = session.participants.filter((p) => p.due).map((p) => p.name);
+  const autoForced = session.participants.filter((p) => p.auto_forced).map((p) => p.name);
+  const selections = session.current_round?.selections ?? [];
 
   return (
     <div>
       <h3>主催モード</h3>
       <p>
-        {state.organizer_mode === "single" ? "主催1人" : "主催2人"}
-        {activeOrganizers.length > 0 ? `: ${activeOrganizers.join(", ")}` : ""}
+        {session.organizer_mode === "single" ? "主催1人" : "主催2人"}
+        {active.length > 0 ? `: ${active.join(", ")}` : ""}
       </p>
 
       <h3>入力済み主催名</h3>
-      <p>{state.organizers.length > 0 ? state.organizers.join(", ") : "なし"}</p>
+      <p>{names(session.organizers.map((o) => o.name))}</p>
 
       <h3>前回参加者</h3>
-      <p>{state.prev_players.length ? state.prev_players.join(", ") : "なし"}</p>
+      <p>{names(session.previous_round_players)}</p>
 
-      <h3>次回の優先対象（{state.miss_threshold}回連続未選出）</h3>
-      <p>{guaranteed.length ? guaranteed.join(", ") : "なし"}</p>
+      <h3>次回の優先対象（一番長く連続で外れている人。このうち 1 人は必ず選ばれる）</h3>
+      <p>{names(due)}</p>
 
       <h3>自動強制対象（参加回数の中央値差）</h3>
-      <p>
-        {state.enable_auto_force
-          ? state.auto_forced_players.length
-            ? state.auto_forced_players.join(", ")
-            : "なし"
-          : "無効"}
-      </p>
+      <p>{session.settings.enable_auto_force ? names(autoForced) : "無効"}</p>
 
       <h3>直近抽選の内訳</h3>
-      {Object.keys(grouped).length === 0 ? (
+      {selections.length === 0 ? (
         <p>なし</p>
       ) : (
         <ul>
-          {Object.entries(grouped).map(([reason, names]) => (
-            <li key={reason}>
-              {REASON_LABEL[reason] ?? reason}: {names.join(", ")}
+          {selections.map((group) => (
+            <li key={group.reason}>
+              {REASON_LABEL[group.reason]}: {group.players.join(", ")}
             </li>
           ))}
         </ul>

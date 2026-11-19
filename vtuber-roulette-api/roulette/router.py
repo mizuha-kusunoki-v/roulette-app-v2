@@ -1,221 +1,214 @@
 import asyncio
-import random
+import uuid
+from datetime import datetime, timezone
+from typing import Callable
 
-from fastapi import APIRouter, HTTPException, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from starlette.requests import HTTPConnection
+from pydantic import BaseModel
 
+from .changes import StateChanges
 from .logic import (
+    ForcedLimitError,
     active_organizers,
+    add_participant,
     apply_draw_result,
-    build_result,
-    compute_auto_forced_players,
-    compute_matchup_key,
+    configure_organizers,
     delete_history_record,
-    get_team_slots,
-    organizer_set,
-    reset_state,
-    sanitize_names,
+    draw_blocker,
+    find_participant,
+    latest_round,
+    mark_presented,
+    new_round,
+    phase,
+    remove_participant,
+    replace_participants,
+    save_settings,
     select_players,
-    state,
-    validate_draw_mode,
+    set_excluded,
+    set_forced,
 )
-
-_PAIR_RETRY_MAX = 10
-from .models import (
+from .models import RouletteState
+from .messages import describe_draw_block, forced_limit_exceeded
+from .protocol import (
     DrawRequest,
-    DrawSettingsRequest,
-    ExcludedPlayersRequest,
-    ForcedPlayersRequest,
-    OrganizerConfigRequest,
-    ParticipantsRequest,
+    ParticipantRequest,
     PresentationCompleteRequest,
+    ReplaceParticipantsRequest,
+    SaveOrganizersRequest,
+    SaveSettingsRequest,
+    SessionState,
+    SetExcludedRequest,
+    SetForcedRequest,
 )
+from .snapshot import build_session_state
 
 router = APIRouter()
 
 
-@router.get("/state")
-def get_state():
-    return state
+def current_session(conn: HTTPConnection) -> RouletteState:
+    """リクエスト (WebSocket を含む) のアプリが持つセッション。置き場所は composition root (main.create_app) が決める。"""
+    return conn.app.state.session
 
 
-def forced_players_limit() -> int:
-    return 2 if state.organizer_mode == "double" else 4
+Session = Depends(current_session)
 
 
-def _clean_forced_player_teams() -> None:
-    """forced_players に含まれないプレイヤーの team 情報を削除する。"""
-    state.forced_player_teams = {
-        p: state.forced_player_teams.get(p, "none")
-        for p in state.forced_players
-    }
+def _require_participant(session: RouletteState, name: str) -> None:
+    if find_participant(session, name) is None:
+        raise HTTPException(status_code=404, detail=f"参加者「{name}」が見つかりません")
 
 
-@router.post("/participants")
-def set_participants(req: ParticipantsRequest):
-    state.participants = sanitize_names(req.participants, limit=1000)
-    organizers = organizer_set()
-
-    state.forced_players = [
-        p for p in state.forced_players if p in state.participants and p not in organizers
-    ][:forced_players_limit()]
-    _clean_forced_player_teams()
-    state.excluded_players = [
-        p for p in state.excluded_players if p in state.participants and p not in organizers
-    ]
-    state.last_players = [
-        p for p in state.last_players if p in state.participants and p not in organizers
-    ]
-    state.prev_players = [
-        p for p in state.prev_players if p in state.participants and p not in organizers
-    ]
-    state.spin_order = [
-        p for p in state.spin_order if p in state.participants and p not in organizers
-    ]
-    state.miss_counts = {p: state.miss_counts.get(p, 0) for p in state.participants}
-    state.participation_counts = {
-        p: state.participation_counts.get(p, 0) for p in state.participants
-    }
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
-
+@router.put("/participants")
+def put_participants(req: ReplaceParticipantsRequest, session: RouletteState = Session):
+    replace_participants(session, req.names)
     return {"ok": True}
 
 
-@router.post("/organizer_config")
-def set_organizer_config(req: OrganizerConfigRequest):
-    state.organizer_mode = req.organizer_mode
-    state.organizers = sanitize_names(req.organizers, limit=10)
-
-    valid_indices = [i for i in req.selected_organizer_indices if 0 <= i < len(state.organizers)]
-    limit = 2 if req.organizer_mode == "double" else 1
-    state.selected_organizer_indices = valid_indices[:limit]
-
-    organizers = organizer_set()
-    state.forced_players = [p for p in state.forced_players if p not in organizers][:forced_players_limit()]
-    _clean_forced_player_teams()
-    state.excluded_players = [p for p in state.excluded_players if p not in organizers]
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+@router.post("/participants/add")
+def post_participant_add(req: ParticipantRequest, session: RouletteState = Session):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="参加者名を入力してください")
+    if find_participant(session, name) is not None:
+        raise HTTPException(status_code=409, detail=f"参加者「{name}」はすでにいます")
+    add_participant(session, name)
     return {"ok": True}
 
 
-@router.post("/forced_players")
-def set_forced_players(req: ForcedPlayersRequest):
-    unique = []
-    organizers = organizer_set()
-    for player in req.forced_players:
-        if player in state.participants and player not in organizers and player not in unique:
-            unique.append(player)
-
-    state.forced_players = unique[:forced_players_limit()]
-    state.forced_player_teams = {
-        p: req.forced_player_teams.get(p, "none")
-        for p in state.forced_players
-    }
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+@router.post("/participants/remove")
+def post_participant_remove(req: ParticipantRequest, session: RouletteState = Session):
+    _require_participant(session, req.name)
+    remove_participant(session, req.name)
     return {"ok": True}
 
 
-@router.post("/excluded_players")
-def set_excluded_players(req: ExcludedPlayersRequest):
-    unique = []
-    organizers = organizer_set()
-    for player in req.excluded_players:
-        if player in state.participants and player not in organizers and player not in unique:
-            unique.append(player)
+@router.post("/participants/forced")
+def post_participant_forced(req: SetForcedRequest, session: RouletteState = Session):
+    _require_participant(session, req.name)
+    # プロトコルではチーム指定なしを "any"、内部では "none" で持つ
+    team = None if req.forced is None else ("none" if req.forced == "any" else req.forced)
+    try:
+        set_forced(session, req.name, team)
+    except ForcedLimitError as e:
+        raise HTTPException(status_code=400, detail=forced_limit_exceeded(e.limit))
+    return {"ok": True}
 
-    state.excluded_players = unique
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
+
+@router.post("/participants/excluded")
+def post_participant_excluded(req: SetExcludedRequest, session: RouletteState = Session):
+    _require_participant(session, req.name)
+    set_excluded(session, req.name, req.excluded)
+    return {"ok": True}
+
+
+@router.put("/organizers")
+def put_organizers(req: SaveOrganizersRequest, session: RouletteState = Session):
+    configure_organizers(
+        session,
+        req.organizer_mode,
+        [o.name for o in req.organizers],
+        [o.name for o in req.organizers if o.active],
+    )
+    return {"ok": True}
+
+
+@router.put("/settings")
+def put_settings(req: SaveSettingsRequest, session: RouletteState = Session):
+    save_settings(session, req.enable_auto_force)
     return {"ok": True}
 
 
 @router.post("/draw")
-def draw(req: DrawRequest):
-    validate_draw_mode(req.mode)
+def draw(req: DrawRequest, session: RouletteState = Session):
+    block = draw_blocker(session, req.mode)
+    if block is not None:
+        raise HTTPException(status_code=400, detail=describe_draw_block(block))
 
-    team_a_slots, team_b_slots = get_team_slots(req.mode)
-    total_slots = team_a_slots + team_b_slots
-
-    organizers = organizer_set()
-    effective_forced = [
-        p for p in state.forced_players if p in state.participants and p not in organizers
-    ]
-
-    team_a_forced_count = sum(
-        1 for p in effective_forced if state.forced_player_teams.get(p) == "A"
+    organizers = active_organizers(session)
+    selection = select_players(session, req.mode)
+    apply_draw_result(
+        session,
+        new_round(
+            session,
+            round_id=str(uuid.uuid4()),
+            drawn_at=datetime.now(timezone.utc).isoformat(),
+            mode=req.mode,
+            selection=selection,
+            organizers=organizers,
+        )
     )
-    team_b_forced_count = sum(
-        1 for p in effective_forced if state.forced_player_teams.get(p) == "B"
-    )
 
-    if team_a_forced_count > team_a_slots:
-        raise HTTPException(
-            status_code=400,
-            detail=f"チームAの強制人数（{team_a_forced_count}人）が抽選枠（{team_a_slots}人）を超えています",
-        )
-    if team_b_forced_count > team_b_slots:
-        raise HTTPException(
-            status_code=400,
-            detail=f"チームBの強制人数（{team_b_forced_count}人）が抽選枠（{team_b_slots}人）を超えています",
-        )
-    if len(effective_forced) > total_slots:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{total_slots}人抽選では手動強制は{total_slots}人以内にしてください（現在{len(effective_forced)}人選択中）",
-        )
-
-    for attempt in range(_PAIR_RETRY_MAX + 1):
-        selected, spin_order, selection_reasons = select_players(req.mode)
-        result = build_result(req.mode, selected)
-        key = compute_matchup_key(result)
-        count = state.pair_counts.get(key, 0)
-        # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
-        if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
-            break
-    apply_draw_result(selected, spin_order, selection_reasons, result)
-
-    return {"round_id": state.round_id, "result": result}
+    # 結果は /session と /ws/session で届くので、ここでは回の ID だけを返す (内部のモデルを外に出さない)
+    latest = latest_round(session)
+    return {"round_id": latest.round_id if latest else None}
 
 
 @router.post("/presentation_complete")
-def presentation_complete(req: PresentationCompleteRequest):
-    if req.round_id != state.round_id:
+def presentation_complete(req: PresentationCompleteRequest, session: RouletteState = Session):
+    if not mark_presented(session, req.round_id):
         return {"ok": False, "reason": "round_id_mismatch"}
-
-    state.phase = "result"
     return {"ok": True}
 
 
 @router.delete("/history/{round_id}")
-def delete_history(round_id: str):
-    if state.phase == "spinning":
+def delete_history(round_id: str, session: RouletteState = Session):
+    if phase(session) == "spinning":
         raise HTTPException(status_code=400, detail="抽選演出中は削除できません")
-    if not delete_history_record(round_id):
+    if not delete_history_record(session, round_id):
         raise HTTPException(status_code=404, detail="指定した抽選結果が見つかりません")
     return {"ok": True}
 
 
-@router.post("/draw_settings")
-def set_draw_settings(req: DrawSettingsRequest):
-    if req.miss_threshold < 1:
-        raise HTTPException(status_code=400, detail="miss_threshold must be at least 1")
-    state.miss_threshold = req.miss_threshold
-    state.enable_auto_force = req.enable_auto_force
-    state.auto_forced_players = compute_auto_forced_players(state.forced_players)
-    return {"ok": True}
-
-
 @router.post("/reset")
-def reset():
-    reset_state()
+def reset(request: Request):
+    # セッションを作り直して差し替える (エンドポイントはリクエストのたびにアプリから受け取るので、それで足りる)
+    request.app.state.session = request.app.state.session_factory.create()
     return {"ok": True}
 
 
-@router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    try:
-        while True:
-            payload = state.model_dump() if hasattr(state, "model_dump") else state.dict()
+async def _push(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
+    """接続直後に build() の結果を送り、その後は内容が変わったときだけ送る。"""
+    last_sent = None
+    while True:
+        # 状態を読む前に version を取っておく。読んだ後の変更は wait_after がすぐ返すので取りこぼさない
+        version = changes.version
+        payload = build().model_dump(mode="json")
+        if payload != last_sent:
             await ws.send_json(payload)
-            await asyncio.sleep(0.1)
-    except Exception:
-        pass
+            last_sent = payload
+        await changes.wait_after(version)
+
+
+async def _wait_disconnect(ws: WebSocket) -> None:
+    """クライアントは何も送ってこないので、受信は切断を知るためだけに使う。"""
+    while True:
+        await ws.receive_text()  # 切断されると WebSocketDisconnect が上がる
+
+
+async def _serve(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
+    await ws.accept()
+    push = asyncio.create_task(_push(ws, build, changes))
+    listen = asyncio.create_task(_wait_disconnect(ws))
+    done, pending = await asyncio.wait({push, listen}, return_when=asyncio.FIRST_COMPLETED)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    for task in done:
+        error = task.exception()
+        if error is not None and not isinstance(error, WebSocketDisconnect):
+            raise error
+
+
+# ── プロトコル (サーバーから送る状態) ─────────────────────────────────────────
+
+
+@router.get("/session")
+def get_session(session: RouletteState = Session) -> SessionState:
+    return build_session_state(session)
+
+
+@router.websocket("/ws/session")
+async def session_websocket(ws: WebSocket):
+    # リセットでセッションが差し替わるので、送るたびにアプリから取り出す
+    await _serve(ws, lambda: build_session_state(current_session(ws)), ws.app.state.changes)

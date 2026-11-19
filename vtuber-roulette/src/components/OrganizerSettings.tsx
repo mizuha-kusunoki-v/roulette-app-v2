@@ -1,24 +1,23 @@
 import { useEffect, useState } from "react";
-import { updateOrganizerConfig } from "../api/client";
-import { OrganizerMode } from "../types";
+import { saveOrganizers } from "../api/client";
+import { Organizer, OrganizerMode } from "../types";
 
 const MAX_ORGANIZERS = 10;
 
 interface Props {
   organizerMode: OrganizerMode;
-  organizers: string[];
-  selectedOrganizerIndices: number[];
+  organizers: Organizer[];
   disabled: boolean;
   onUpdated: () => void;
 }
 
-export const OrganizerSettings = ({
-  organizerMode,
-  organizers,
-  selectedOrganizerIndices,
-  disabled,
-  onUpdated,
-}: Props) => {
+export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, disabled, onUpdated }: Props) => {
+  // 保存済みの主催。編集中の値 (hosts, selectedIndices) はこの画面の中だけで持ち、保存で送る
+  const organizers = savedOrganizers.map((o) => o.name);
+  const activeIndices = savedOrganizers.flatMap((o, i) => (o.active ? [i] : []));
+  // 誰も選ばれていなければ先頭を選んだ状態から始める (主催を初めて追加したとき、その人が選ばれた状態になる)
+  const selectedOrganizerIndices = activeIndices.length > 0 ? activeIndices : [0];
+
   const [mode, setMode] = useState<OrganizerMode>(organizerMode);
   const [hosts, setHosts] = useState<string[]>(organizers);
   const [selectedIndices, setSelectedIndices] = useState<number[]>(selectedOrganizerIndices);
@@ -66,7 +65,10 @@ export const OrganizerSettings = ({
   };
 
   const save = async () => {
-    await updateOrganizerConfig(mode, hosts, selectedIndices);
+    await saveOrganizers(
+      mode,
+      hosts.map((name, i) => ({ name, active: selectedIndices.includes(i) })),
+    );
     await onUpdated();
   };
 
