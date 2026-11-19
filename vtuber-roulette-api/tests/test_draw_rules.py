@@ -120,3 +120,18 @@ def test_players_who_missed_too_often_are_selected_when_they_fit():
             free = slots(s.mode) - len(s.forced)
             if len(due) <= free:
                 assert set(due) <= set(r.selected), (s, due, r.reasons)
+
+
+def test_a_participant_with_the_same_name_as_an_organizer_is_an_ordinary_participant():
+    # 主催と参加者の名前の一致は偶然の一致で、別人として扱う (運用では被らない前提だが、照合はしない)
+    setup_session(4, "standard_3")
+    state.organizers = ["P00"]
+    state.forced_players = ["P00"]
+    state.forced_player_teams = {"P00": "B"}
+
+    r = draw("standard_3")
+
+    assert r.team_a[0] != "P00"  # 抽選枠のチームAに主催が入るわけではない
+    assert "P00" in r.team_b  # 参加者の P00 は強制どおりチームBに入る
+    assert state.participation_counts["P00"] == 1
+

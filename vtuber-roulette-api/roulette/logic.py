@@ -47,10 +47,6 @@ def active_organizers() -> List[str]:
     return result[:limit]
 
 
-def organizer_set() -> set[str]:
-    return set(active_organizers())
-
-
 def get_team_slots(mode: DrawMode) -> tuple[int, int]:
     """抽選で埋めるチームA・チームBのスロット数を返す。"""
     if mode == "standard_3":
@@ -72,11 +68,10 @@ class ForcedLimitError(Exception):
 
 
 def _drop_records_of_non_participants() -> None:
-    """参加者でなくなった人 (と主催) の強制・除外・前回参加などの記録を消す。"""
-    organizers = organizer_set()
+    """参加者でなくなった人の強制・除外・前回参加などの記録を消す。"""
 
     def keep(names: List[str]) -> List[str]:
-        return [p for p in names if p in state.participants and p not in organizers]
+        return [p for p in names if p in state.participants]
 
     state.forced_players = keep(state.forced_players)[:forced_players_limit()]
     state.forced_player_teams = {p: state.forced_player_teams.get(p, "none") for p in state.forced_players}
@@ -104,8 +99,6 @@ def remove_participant(name: str) -> None:
 
 def set_forced(name: str, team: str | None) -> None:
     """name の手動強制を設定する。team は "none" (チーム指定なし) / "A" / "B"、None で解除。"""
-    if name in organizer_set():
-        return
     if team is None:
         state.forced_players = [p for p in state.forced_players if p != name]
         state.forced_player_teams.pop(name, None)
@@ -119,8 +112,6 @@ def set_forced(name: str, team: str | None) -> None:
 
 
 def set_excluded(name: str, excluded: bool) -> None:
-    if name in organizer_set():
-        return
     others = [p for p in state.excluded_players if p != name]
     state.excluded_players = others + [name] if excluded else others
     state.auto_forced_players = compute_auto_forced_players(state.forced_players)
@@ -133,10 +124,9 @@ def configure_organizers(mode: OrganizerMode, names: List[str], active: List[str
     selected = [state.organizers.index(n) for n in sanitize_names(active, limit=10) if n in state.organizers]
     state.selected_organizer_indices = sorted(selected)[: 2 if mode == "double" else 1]
 
-    organizers = organizer_set()
-    state.forced_players = [p for p in state.forced_players if p not in organizers][:forced_players_limit()]
+    # 主催 2 人モードでは手動強制の上限が下がる
+    state.forced_players = state.forced_players[:forced_players_limit()]
     state.forced_player_teams = {p: state.forced_player_teams.get(p, "none") for p in state.forced_players}
-    state.excluded_players = [p for p in state.excluded_players if p not in organizers]
     state.auto_forced_players = compute_auto_forced_players(state.forced_players)
 
 
@@ -156,12 +146,7 @@ def compute_auto_forced_players(
         return []
 
     skip = set(already_selected or []) | set(state.excluded_players)
-    organizers = organizer_set()
-    participant_counts = [
-        state.participation_counts.get(p, 0)
-        for p in state.participants
-        if p not in organizers
-    ]
+    participant_counts = [state.participation_counts.get(p, 0) for p in state.participants]
     if not participant_counts:
         return []
 
@@ -171,8 +156,7 @@ def compute_auto_forced_players(
     auto_forced = [
         p
         for p in state.participants
-        if p not in organizers
-        and p not in manual_forced
+        if p not in manual_forced
         and p not in state.last_players
         and p not in skip
         and state.miss_counts.get(p, 0) < state.miss_threshold
@@ -197,16 +181,14 @@ def forced_players_limit() -> int:
 
 
 def manual_forced_players() -> List[str]:
-    """手動強制のうち、今の参加者で主催ではない人。"""
-    organizers = organizer_set()
-    return [p for p in state.forced_players if p in state.participants and p not in organizers]
+    """手動強制のうち、今の参加者にいる人。"""
+    return [p for p in state.forced_players if p in state.participants]
 
 
 def is_due(name: str) -> bool:
     """ミス回数の保証の対象か。次の抽選で、枠が足りる限り手動強制の次に優先して選ばれる。"""
     return (
         name in state.participants
-        and name not in organizer_set()
         and name not in state.last_players
         and name not in state.excluded_players
         and state.miss_counts.get(name, 0) >= state.miss_threshold
@@ -235,13 +217,9 @@ def draw_blocker(mode: DrawMode) -> str | None:
     if len(forced) > total_slots:
         return f"{total_slots}人抽選では手動強制は{total_slots}人以内にしてください（現在{len(forced)}人選択中）"
 
-    organizers = organizer_set()
-    eligible = {
-        p for p in state.participants
-        if p not in organizers and p not in state.excluded_players
-    } | set(forced)
+    eligible = {p for p in state.participants if p not in state.excluded_players} | set(forced)
     if len(eligible) < total_slots:
-        return f"{total_slots}人抽選には、主催と除外を除いて{total_slots}人以上の参加者が必要です"
+        return f"{total_slots}人抽選には、除外を除いて{total_slots}人以上の参加者が必要です"
     return None
 
 
@@ -253,8 +231,6 @@ def select_players(mode: DrawMode):
     """
     selection_reasons: Dict[str, str] = {}
     team_a_slots, team_b_slots = get_team_slots(mode)
-
-    organizers = organizer_set()
 
     # 有効な手動強制プレイヤー一覧
     all_manual_forced = manual_forced_players()
@@ -314,8 +290,7 @@ def select_players(mode: DrawMode):
     # 前回不参加プールを除いた候補
     non_prev_pool = [
         p for p in state.participants
-        if p not in organizers
-        and p not in state.last_players
+        if p not in state.last_players
         and p not in selected_set
         and p not in state.excluded_players
     ]
@@ -336,8 +311,7 @@ def select_players(mode: DrawMode):
     if len(team_a) < team_a_slots or len(team_b) < team_b_slots:
         prev_pool = [
             p for p in state.last_players
-            if p not in organizers
-            and p not in selected_set
+            if p not in selected_set
             and p not in state.excluded_players
         ]
         random.shuffle(prev_pool)
@@ -408,16 +382,10 @@ def apply_draw_result(
     selection_reasons: Dict[str, str],
     result: RouletteResult,
 ) -> None:
-    organizers = organizer_set()
     new_miss: Dict[str, int] = {}
     new_participation_counts: Dict[str, int] = {}
 
     for player in state.participants:
-        if player in organizers:
-            new_miss[player] = state.miss_counts.get(player, 0)
-            new_participation_counts[player] = state.participation_counts.get(player, 0)
-            continue
-
         new_miss[player] = 0 if player in selected else state.miss_counts.get(player, 0) + 1
         new_participation_counts[player] = (
             state.participation_counts.get(player, 0) + (1 if player in selected else 0)
@@ -469,10 +437,9 @@ def delete_history_record(round_id: str) -> bool:
     miss = {p: 0 for p in state.participants}
     counts = {p: 0 for p in state.participants}
     for rec in remaining:
-        skip = set(rec.organizers)
         picked = set(rec.selected)
         for p in rec.participants:
-            if p not in current or p in skip:
+            if p not in current:
                 continue
             if p in picked:
                 miss[p] = 0
