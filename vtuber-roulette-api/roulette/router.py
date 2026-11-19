@@ -4,10 +4,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from starlette.requests import HTTPConnection
 from pydantic import BaseModel
 
-from .changes import state_changes
+from .changes import StateChanges
 from .logic import (
     ForcedLimitError,
     active_organizers,
@@ -21,7 +22,6 @@ from .logic import (
     new_record,
     remove_participant,
     replace_participants,
-    reset_session,
     save_settings,
     select_players,
     set_excluded,
@@ -46,12 +46,10 @@ _PAIR_RETRY_MAX = 10
 
 router = APIRouter()
 
-# 抽選のセッション。エンドポイントは依存性注入 (Depends(current_session)) で受け取る
-_session = RouletteState()
 
-
-def current_session() -> RouletteState:
-    return _session
+def current_session(conn: HTTPConnection) -> RouletteState:
+    """リクエスト (WebSocket を含む) のアプリが持つセッション。置き場所は composition root (main.create_app) が決める。"""
+    return conn.app.state.session
 
 
 Session = Depends(current_session)
@@ -173,22 +171,23 @@ def delete_history(round_id: str, session: RouletteState = Session):
 
 
 @router.post("/reset")
-def reset(session: RouletteState = Session):
-    reset_session(session)
+def reset(request: Request):
+    # セッションを作り直して差し替える (エンドポイントはリクエストのたびにアプリから受け取るので、それで足りる)
+    request.app.state.session = request.app.state.session_factory.create()
     return {"ok": True}
 
 
-async def _push(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
+async def _push(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
     """接続直後に build() の結果を送り、その後は内容が変わったときだけ送る。"""
     last_sent = None
     while True:
         # 状態を読む前に version を取っておく。読んだ後の変更は wait_after がすぐ返すので取りこぼさない
-        version = state_changes.version
+        version = changes.version
         payload = build().model_dump(mode="json")
         if payload != last_sent:
             await ws.send_json(payload)
             last_sent = payload
-        await state_changes.wait_after(version)
+        await changes.wait_after(version)
 
 
 async def _wait_disconnect(ws: WebSocket) -> None:
@@ -197,9 +196,9 @@ async def _wait_disconnect(ws: WebSocket) -> None:
         await ws.receive_text()  # 切断されると WebSocketDisconnect が上がる
 
 
-async def _serve(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
+async def _serve(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
     await ws.accept()
-    push = asyncio.create_task(_push(ws, build))
+    push = asyncio.create_task(_push(ws, build, changes))
     listen = asyncio.create_task(_wait_disconnect(ws))
     done, pending = await asyncio.wait({push, listen}, return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
@@ -221,4 +220,5 @@ def get_session(session: RouletteState = Session) -> SessionState:
 
 @router.websocket("/ws/session")
 async def session_websocket(ws: WebSocket):
-    await _serve(ws, lambda: build_session_state(current_session()))
+    # リセットでセッションが差し替わるので、送るたびにアプリから取り出す
+    await _serve(ws, lambda: build_session_state(current_session(ws)), ws.app.state.changes)

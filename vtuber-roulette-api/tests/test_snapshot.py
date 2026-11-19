@@ -9,7 +9,6 @@ import random
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import main
 from roulette import logic
 from roulette.logic import DOUBLE_MODES, SINGLE_MODES
 from roulette.models import DrawMode
@@ -108,7 +107,7 @@ def test_previous_round_players_are_from_the_round_before_the_latest():
 def test_session_is_served_over_http():
     setup_session(5)
 
-    session = TestClient(main.app).get("/session").json()
+    session = TestClient(harness.app()).get("/session").json()
 
     assert [p["name"] for p in session["participants"]] == players(5)
     assert session["phase"] == "idle" and session["current_round"] is None

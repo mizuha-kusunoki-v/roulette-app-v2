@@ -27,5 +27,3 @@ class StateChanges:
             await self._cond.wait_for(lambda: self._version != version)
             return self._version
 
-
-state_changes = StateChanges()

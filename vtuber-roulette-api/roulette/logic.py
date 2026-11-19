@@ -26,14 +26,7 @@ from .models import (
 
 # ── セッション ───────────────────────────────────────────────────────────────
 # 抽選の状態 (RouletteState) はグローバルに持たず、使う関数が引数 session で受け取る。
-# 実際のセッションを持つのは router (依存性注入で各エンドポイントに渡す)。
-
-
-def reset_session(session: RouletteState) -> None:
-    """セッションを初期状態に戻す。同じオブジェクトを使い続ける側のため、作り直さず中身を入れ替える。"""
-    fresh = RouletteState()
-    for field in RouletteState.model_fields:
-        setattr(session, field, getattr(fresh, field))
+# セッションを作るのは sessions.SessionFactory、持つのは composition root (main.create_app)。
 
 
 # ── ユーティリティ ─────────────────────────────────────────────────────────────

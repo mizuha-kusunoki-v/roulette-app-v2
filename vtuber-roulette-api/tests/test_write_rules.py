@@ -18,7 +18,7 @@ DERIVED = {
     "result",
     "round_id",
 }
-WRITERS = {"_store_tally", "_show_latest_round", "reset_session"}
+WRITERS = {"_store_tally", "_show_latest_round"}
 # セッションを表す変数名 (logic などの関数は引数 session で受け取る)
 SESSION_NAMES = {"session", "state"}
 SOURCES = sorted((Path(__file__).parent.parent / "roulette").glob("*.py"))

@@ -3,12 +3,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
-import main
+from tests import harness
 
 
 @pytest.fixture
 def client():
-    return TestClient(main.app)
+    return TestClient(harness.app())
 
 
 def session(client):

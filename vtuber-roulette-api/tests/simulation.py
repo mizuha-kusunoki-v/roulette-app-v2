@@ -38,8 +38,7 @@ def setup_session(
 
     forced_teams は "none" (チーム指定なし) / "A" / "B"。
     """
-    session = harness.session()
-    logic.reset_session(session)
+    session = harness.new_session()
     logic.replace_participants(session, players(n))
     if mode in HOST_MODES:
         logic.configure_organizers(session, "double", ["Host1", "Host2"], ["Host1", "Host2"])
