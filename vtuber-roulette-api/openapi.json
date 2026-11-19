@@ -1,0 +1,982 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/participants": {
+      "put": {
+        "summary": "Put Participants",
+        "operationId": "put_participants_participants_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceParticipantsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/participants/add": {
+      "post": {
+        "summary": "Post Participant Add",
+        "operationId": "post_participant_add_participants_add_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/participants/remove": {
+      "post": {
+        "summary": "Post Participant Remove",
+        "operationId": "post_participant_remove_participants_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/participants/forced": {
+      "post": {
+        "summary": "Post Participant Forced",
+        "operationId": "post_participant_forced_participants_forced_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetForcedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/participants/excluded": {
+      "post": {
+        "summary": "Post Participant Excluded",
+        "operationId": "post_participant_excluded_participants_excluded_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetExcludedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizers": {
+      "put": {
+        "summary": "Put Organizers",
+        "operationId": "put_organizers_organizers_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOrganizersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings": {
+      "put": {
+        "summary": "Put Settings",
+        "operationId": "put_settings_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/draw": {
+      "post": {
+        "summary": "Draw",
+        "operationId": "draw_draw_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrawRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/presentation_complete": {
+      "post": {
+        "summary": "Presentation Complete",
+        "operationId": "presentation_complete_presentation_complete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresentationCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/{round_id}": {
+      "delete": {
+        "summary": "Delete History",
+        "operationId": "delete_history_history__round_id__delete",
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Round Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reset": {
+      "post": {
+        "summary": "Reset",
+        "operationId": "reset_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session": {
+      "get": {
+        "summary": "Get Session",
+        "operationId": "get_session_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionState"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CurrentRound": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "title": "Round Id"
+          },
+          "result": {
+            "$ref": "#/components/schemas/RouletteResult"
+          },
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/SelectionGroup"
+            },
+            "type": "array",
+            "title": "Selections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "result",
+          "selections"
+        ],
+        "title": "CurrentRound"
+      },
+      "DrawOption": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "standard_3",
+              "standard_4",
+              "hosts_vs_duo",
+              "hosts_split_pairs"
+            ],
+            "title": "Mode"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "available",
+          "unavailable_reason"
+        ],
+        "title": "DrawOption"
+      },
+      "DrawRecord": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "title": "Round Id"
+          },
+          "drawn_at": {
+            "type": "string",
+            "title": "Drawn At"
+          },
+          "result": {
+            "$ref": "#/components/schemas/RouletteResult"
+          },
+          "selected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selected"
+          },
+          "organizers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Organizers"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Participants"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Reasons",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "drawn_at",
+          "result",
+          "selected",
+          "organizers",
+          "participants"
+        ],
+        "title": "DrawRecord"
+      },
+      "DrawRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "standard_3",
+              "standard_4",
+              "hosts_vs_duo",
+              "hosts_split_pairs"
+            ],
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "DrawRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Organizer": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "active"
+        ],
+        "title": "Organizer"
+      },
+      "ParticipantRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ParticipantRequest"
+      },
+      "ParticipantStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "participation_count": {
+            "type": "integer",
+            "title": "Participation Count"
+          },
+          "miss_count": {
+            "type": "integer",
+            "title": "Miss Count"
+          },
+          "forced": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "A",
+                  "B"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forced"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "auto_forced": {
+            "type": "boolean",
+            "title": "Auto Forced"
+          },
+          "due": {
+            "type": "boolean",
+            "title": "Due"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "participation_count",
+          "miss_count",
+          "forced",
+          "excluded",
+          "auto_forced",
+          "due"
+        ],
+        "title": "ParticipantStatus"
+      },
+      "PresentationCompleteRequest": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "title": "Round Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id"
+        ],
+        "title": "PresentationCompleteRequest"
+      },
+      "ReplaceParticipantsRequest": {
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "names"
+        ],
+        "title": "ReplaceParticipantsRequest"
+      },
+      "ResultTeam": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "players": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Players"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "players"
+        ],
+        "title": "ResultTeam"
+      },
+      "RouletteResult": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "standard_3",
+              "standard_4",
+              "hosts_vs_duo",
+              "hosts_split_pairs"
+            ],
+            "title": "Kind"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/ResultTeam"
+            },
+            "type": "array",
+            "title": "Teams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "teams"
+        ],
+        "title": "RouletteResult"
+      },
+      "SaveOrganizersRequest": {
+        "properties": {
+          "organizer_mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "title": "Organizer Mode"
+          },
+          "organizers": {
+            "items": {
+              "$ref": "#/components/schemas/Organizer"
+            },
+            "type": "array",
+            "title": "Organizers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organizer_mode",
+          "organizers"
+        ],
+        "title": "SaveOrganizersRequest"
+      },
+      "SaveSettingsRequest": {
+        "properties": {
+          "miss_threshold": {
+            "type": "integer",
+            "title": "Miss Threshold"
+          },
+          "enable_auto_force": {
+            "type": "boolean",
+            "title": "Enable Auto Force"
+          }
+        },
+        "type": "object",
+        "required": [
+          "miss_threshold",
+          "enable_auto_force"
+        ],
+        "title": "SaveSettingsRequest"
+      },
+      "SelectionGroup": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "manual_check",
+              "miss_3",
+              "median_gap",
+              "random",
+              "exception_prev_round"
+            ],
+            "title": "Reason"
+          },
+          "players": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Players"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "players"
+        ],
+        "title": "SelectionGroup"
+      },
+      "SessionState": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "spinning",
+              "result"
+            ],
+            "title": "Phase"
+          },
+          "organizer_mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "title": "Organizer Mode"
+          },
+          "organizers": {
+            "items": {
+              "$ref": "#/components/schemas/Organizer"
+            },
+            "type": "array",
+            "title": "Organizers"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantStatus"
+            },
+            "type": "array",
+            "title": "Participants"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          },
+          "draw_options": {
+            "items": {
+              "$ref": "#/components/schemas/DrawOption"
+            },
+            "type": "array",
+            "title": "Draw Options"
+          },
+          "current_round": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrentRound"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_round_players": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Round Players"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/DrawRecord"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phase",
+          "organizer_mode",
+          "organizers",
+          "participants",
+          "settings",
+          "draw_options",
+          "current_round",
+          "previous_round_players",
+          "history"
+        ],
+        "title": "SessionState"
+      },
+      "SetExcludedRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "excluded"
+        ],
+        "title": "SetExcludedRequest"
+      },
+      "SetForcedRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "forced": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "A",
+                  "B"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forced"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "forced"
+        ],
+        "title": "SetForcedRequest"
+      },
+      "Settings": {
+        "properties": {
+          "miss_threshold": {
+            "type": "integer",
+            "title": "Miss Threshold"
+          },
+          "enable_auto_force": {
+            "type": "boolean",
+            "title": "Enable Auto Force"
+          },
+          "forced_limit": {
+            "type": "integer",
+            "title": "Forced Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "miss_threshold",
+          "enable_auto_force",
+          "forced_limit"
+        ],
+        "title": "Settings"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
