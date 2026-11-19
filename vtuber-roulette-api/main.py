@@ -12,6 +12,10 @@ from roulette.router import router as roulette_router
 from roulette.sessions import SessionFactory
 
 
+# フロントの開発サーバーの住所。localhost と 127.0.0.1 は別のオリジンなので、どちらで開いても使えるよう両方を許可する
+FRONTEND_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
 def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
     factory = session_factory or SessionFactory()
 
@@ -22,7 +26,7 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
+        allow_origins=FRONTEND_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
