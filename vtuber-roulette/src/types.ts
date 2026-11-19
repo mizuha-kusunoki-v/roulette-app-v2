@@ -48,27 +48,3 @@ export type RouletteState = {
   enable_auto_force: boolean;
   history: DrawRecord[];
 };
-
-// =============================================================================
-// 縛りルーレット (Restriction Roulette)
-// =============================================================================
-
-export type RestrictionItem = {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  weight: number;    // 出現重み 1〜5
-  use_count: number;
-};
-
-export type RestrictionState = {
-  items: RestrictionItem[];
-  result: RestrictionItem | null;
-  target: string;                 // 適用対象テキスト
-  phase: "idle" | "spinning" | "result";
-  round_id: string | null;
-  history: string[];              // 選択済み item.id の履歴
-  exclude_recent_count: number;   // 直近 N 回を抽選除外
-  spin_order: string[];           // アニメーション用 item.name リスト
-};

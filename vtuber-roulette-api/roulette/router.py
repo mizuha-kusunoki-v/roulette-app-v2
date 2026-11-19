@@ -1,8 +1,9 @@
 import asyncio
 import random
 
-from fastapi import APIRouter, HTTPException, WebSocket
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from .changes import state_changes
 from .logic import (
     active_organizers,
     apply_draw_result,
@@ -209,13 +210,35 @@ def reset():
     return {"ok": True}
 
 
+async def _push_state(ws: WebSocket) -> None:
+    """接続直後に状態を送り、その後は状態が変わったときだけ送る。"""
+    last_sent = None
+    while True:
+        # 状態を読む前に version を取っておく。読んだ後の変更は wait_after がすぐ返すので取りこぼさない
+        version = state_changes.version
+        payload = state.model_dump(mode="json")
+        if payload != last_sent:
+            await ws.send_json(payload)
+            last_sent = payload
+        await state_changes.wait_after(version)
+
+
+async def _wait_disconnect(ws: WebSocket) -> None:
+    """クライアントは何も送ってこないので、受信は切断を知るためだけに使う。"""
+    while True:
+        await ws.receive_text()  # 切断されると WebSocketDisconnect が上がる
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    try:
-        while True:
-            payload = state.model_dump() if hasattr(state, "model_dump") else state.dict()
-            await ws.send_json(payload)
-            await asyncio.sleep(0.1)
-    except Exception:
-        pass
+    push = asyncio.create_task(_push_state(ws))
+    listen = asyncio.create_task(_wait_disconnect(ws))
+    done, pending = await asyncio.wait({push, listen}, return_when=asyncio.FIRST_COMPLETED)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    for task in done:
+        error = task.exception()
+        if error is not None and not isinstance(error, WebSocketDisconnect):
+            raise error

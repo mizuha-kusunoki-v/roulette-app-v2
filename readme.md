@@ -1,7 +1,7 @@
 # VTuber ルーレットアプリ
 
 配信用のチーム対戦メンバー抽選ツールです。  
-React フロントエンド + FastAPI バックエンドの構成で動作します。
+React (Vite) フロントエンド + FastAPI バックエンドの構成で動作します。
 
 ---
 
@@ -24,7 +24,6 @@ React フロントエンド + FastAPI バックエンドの構成で動作しま
 
 ### その他
 - 抽選履歴の一覧表示・削除
-- 縛りルーレット（対戦時の縛りをランダム抽選）
 - スロット演出アニメーション（5秒）
 - OBS 用ビュワーページ（`/viewer/result`）
 - WebSocket によるリアルタイム状態同期
@@ -35,7 +34,9 @@ React フロントエンド + FastAPI バックエンドの構成で動作しま
 
 ```
 roulette-app_new/
-├── vtuber-roulette/         # フロントエンド (React)
+├── vtuber-roulette/         # フロントエンド (React + Vite)
+│   ├── index.html           # エントリー HTML
+│   ├── vite.config.ts       # Vite 設定 (開発サーバーは port 3000)
 │   └── src/
 │       ├── AdminApp.tsx     # 管理画面
 │       ├── App.tsx          # OBS ビュワー統合
@@ -46,12 +47,14 @@ roulette-app_new/
 ├── vtuber-roulette-api/     # バックエンド (FastAPI)
 │   ├── main.py              # アプリエントリーポイント
 │   ├── draw_config.py       # 自動強制抽選のパラメータ設定
-│   ├── roulette/            # 抽選ルーレットモジュール
-│   │   ├── logic.py         # 抽選ロジック
-│   │   ├── models.py        # データモデル
-│   │   └── router.py        # API ルーター
-│   └── restriction/         # 縛りルーレットモジュール
+│   ├── pyproject.toml       # 依存定義 (uv)
+│   ├── uv.lock              # 依存のバージョン固定 (uv が生成)
+│   └── roulette/            # 抽選ルーレットモジュール
+│       ├── logic.py         # 抽選ロジック
+│       ├── models.py        # データモデル
+│       └── router.py        # API ルーター
 │
+├── setup.bat                # 初回セットアップスクリプト (Windows)
 └── start.bat                # ワンクリック起動スクリプト (Windows)
 ```
 
@@ -60,24 +63,37 @@ roulette-app_new/
 ## セットアップ
 
 ### 必要なもの
-- Python 3.11+
-- Node.js 18+
+- [uv](https://docs.astral.sh/uv/)（`winget install astral-sh.uv`）
+  - Python 3.11 は uv が自動で用意するので、別途インストールは不要
+- Node.js 20.19+ または 22.12+（Vite 8 の要件）
 
-### バックエンド
+### Windows（推奨）
+
+ルートの `setup.bat` をダブルクリックすると、バックエンドとフロントエンドの依存がまとめて入ります。
+
+### 手動セットアップ
+
+**バックエンド：**
+```bash
+cd vtuber-roulette-api
+uv sync --locked
+```
+
+**フロントエンド：**
+```bash
+cd vtuber-roulette
+npm ci
+```
+
+### 依存の追加・更新（バックエンド）
 
 ```bash
 cd vtuber-roulette-api
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+uv add <パッケージ名>   # 追加
+uv lock --upgrade       # 全依存を最新版に更新
 ```
 
-### フロントエンド
-
-```bash
-cd vtuber-roulette
-npm install
-```
+`pyproject.toml` と `uv.lock` を両方コミットしてください。
 
 ---
 
@@ -98,7 +114,7 @@ start.bat
 **バックエンド：**
 ```bash
 cd vtuber-roulette-api
-.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000 --reload
+uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 **フロントエンド：**
