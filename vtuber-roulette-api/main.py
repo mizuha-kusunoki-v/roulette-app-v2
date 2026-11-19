@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from roulette.router import router as roulette_router
-from restriction.router import router as restriction_router
 
 app = FastAPI()
 
@@ -15,4 +14,3 @@ app.add_middleware(
 )
 
 app.include_router(roulette_router)
-app.include_router(restriction_router)

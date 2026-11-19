@@ -24,7 +24,6 @@ React フロントエンド + FastAPI バックエンドの構成で動作しま
 
 ### その他
 - 抽選履歴の一覧表示・削除
-- 縛りルーレット（対戦時の縛りをランダム抽選）
 - スロット演出アニメーション（5秒）
 - OBS 用ビュワーページ（`/viewer/result`）
 - WebSocket によるリアルタイム状態同期
@@ -46,11 +45,10 @@ roulette-app_new/
 ├── vtuber-roulette-api/     # バックエンド (FastAPI)
 │   ├── main.py              # アプリエントリーポイント
 │   ├── draw_config.py       # 自動強制抽選のパラメータ設定
-│   ├── roulette/            # 抽選ルーレットモジュール
-│   │   ├── logic.py         # 抽選ロジック
-│   │   ├── models.py        # データモデル
-│   │   └── router.py        # API ルーター
-│   └── restriction/         # 縛りルーレットモジュール
+│   └── roulette/            # 抽選ルーレットモジュール
+│       ├── logic.py         # 抽選ロジック
+│       ├── models.py        # データモデル
+│       └── router.py        # API ルーター
 │
 └── start.bat                # ワンクリック起動スクリプト (Windows)
 ```
