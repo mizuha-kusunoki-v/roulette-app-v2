@@ -334,8 +334,6 @@ export interface components {
         };
         /** SaveSettingsRequest */
         SaveSettingsRequest: {
-            /** Miss Threshold */
-            miss_threshold: number;
             /** Enable Auto Force */
             enable_auto_force: boolean;
         };
@@ -390,8 +388,6 @@ export interface components {
         };
         /** Settings */
         Settings: {
-            /** Miss Threshold */
-            miss_threshold: number;
             /** Enable Auto Force */
             enable_auto_force: boolean;
             /** Forced Limit */

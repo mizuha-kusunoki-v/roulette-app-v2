@@ -115,9 +115,7 @@ def put_organizers(req: SaveOrganizersRequest, session: RouletteState = Session)
 
 @router.put("/settings")
 def put_settings(req: SaveSettingsRequest, session: RouletteState = Session):
-    if req.miss_threshold < 1:
-        raise HTTPException(status_code=400, detail="救済閾値は1以上にしてください")
-    save_settings(session, req.miss_threshold, req.enable_auto_force)
+    save_settings(session, req.enable_auto_force)
     return {"ok": True}
 
 

@@ -176,8 +176,7 @@ def configure_organizers(
         set_forced(session, p, None)
 
 
-def save_settings(session: RouletteState, miss_threshold: int, enable_auto_force: bool) -> None:
-    session.miss_threshold = miss_threshold
+def save_settings(session: RouletteState, enable_auto_force: bool) -> None:
     session.enable_auto_force = enable_auto_force
 
 

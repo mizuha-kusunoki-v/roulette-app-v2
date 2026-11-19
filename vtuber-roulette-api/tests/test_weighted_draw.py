@@ -103,7 +103,7 @@ def test_sampling_gives_the_same_chances_as_enumerating_every_lineup(monkeypatch
     # 組み合わせが多いとき (ENUM_LIMIT 超え) の道を、全部列挙する道と比べる。
     # 6 人で 4 人抽選を 30 回: 前回出た 4 人から 2 人を足すので、外れた回数で重みが変わり、
     # 同じ対戦カードが何度も出て減点も効く
-    harness.use(SessionBuilder().participants(6).settings(miss_threshold=10).build())
+    harness.use(SessionBuilder().participants(6).build())
     for _ in range(30):
         draw("standard_4")
     session = harness.session()

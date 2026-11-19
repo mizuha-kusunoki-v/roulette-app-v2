@@ -1,19 +1,17 @@
 """
 Draw policy settings.
 
-Adjust these values to tune auto-force behavior.
+Adjust these values to tune the weighted draw and the auto-force display.
+Whether auto-force is on is a per-session setting (the admin screen), not set here.
 """
 
-# If enabled, players far below the participation median are force-selected.
-ENABLE_AUTO_FORCE_BY_MEDIAN_GAP = True
-
-# A player becomes auto-force target when:
+# A player is shown as an auto-force target (and gets the "median_gap" reason when drawn) when:
 # participation_count <= median_participation - AUTO_FORCE_MEDIAN_GAP
 #
 # Initial value = 2 to treat only clear under-participation as "significant".
 AUTO_FORCE_MEDIAN_GAP = 2
 
-# Limit auto-forced players per draw. 0 means no limit.
+# Limit the players shown as auto-force targets. 0 means no limit.
 AUTO_FORCE_MAX_PER_DRAW = 2
 
 

@@ -27,7 +27,6 @@ def random_setup(rng: random.Random) -> None:
     setup_session(
         n,
         "hosts_vs_duo" if double else "standard_4",
-        miss_threshold=rng.randint(1, 4),
         excluded=rng.sample(names, rng.randint(0, n)),
         forced=forced,
         forced_teams={p: rng.choice(["none", "A", "B"]) for p in forced},

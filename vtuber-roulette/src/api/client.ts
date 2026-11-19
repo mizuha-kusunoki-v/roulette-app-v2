@@ -51,11 +51,8 @@ export const setExcluded = (name: string, excluded: boolean) =>
 export const saveOrganizers = (organizerMode: OrganizerMode, organizers: Organizer[]) =>
   send<Schemas["SaveOrganizersRequest"]>("PUT", "/organizers", { organizer_mode: organizerMode, organizers });
 
-export const saveSettings = (missThreshold: number, enableAutoForce: boolean) =>
-  send<Schemas["SaveSettingsRequest"]>("PUT", "/settings", {
-    miss_threshold: missThreshold,
-    enable_auto_force: enableAutoForce,
-  });
+export const saveSettings = (enableAutoForce: boolean) =>
+  send<Schemas["SaveSettingsRequest"]>("PUT", "/settings", { enable_auto_force: enableAutoForce });
 
 export const draw = (mode: DrawMode) => send<Schemas["DrawRequest"]>("POST", "/draw", { mode });
 

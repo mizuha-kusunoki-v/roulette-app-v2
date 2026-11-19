@@ -57,10 +57,6 @@ def organizer_mode() -> str:
     return session().organizer_mode
 
 
-def miss_threshold() -> int:
-    return session().miss_threshold
-
-
 def phase() -> str:
     return logic.phase(session())
 
@@ -154,7 +150,6 @@ class Before:
     last_round_players: List[str]
     active_organizers: List[str]
     miss_counts: Dict[str, int]
-    miss_threshold: int
 
 
 def before() -> Before:
@@ -163,7 +158,6 @@ def before() -> Before:
         last_round_players=last_round_players(),
         active_organizers=active_organizers(),
         miss_counts=miss_counts(),
-        miss_threshold=miss_threshold(),
     )
 
 

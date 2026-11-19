@@ -39,7 +39,7 @@ def test_state_wrapper_skips_forced_resting_excluded_and_due_players():
     harness.use(
         SessionBuilder()
         .participants(10)
-        .settings(miss_threshold=3, auto_force=True)
+        .settings(auto_force=True)
         .excluded("P02")
         .forced("P03")
         .counts(participation={p: 9 for p in ("P05", "P06", "P07", "P08", "P09")}, miss={"P01": 5})

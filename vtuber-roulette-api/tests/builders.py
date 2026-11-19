@@ -24,7 +24,6 @@ class SessionBuilder:
         self._organizer_mode: OrganizerMode = "single"
         self._organizers: List[str] = []
         self._active_organizers: List[str] = []
-        self._miss_threshold = 3
         self._auto_force = False
         self._excluded: List[str] = []
         self._forced: Dict[str, str] = {}
@@ -51,8 +50,7 @@ class SessionBuilder:
             return self.organizers("single", ["Host1"])
         return self
 
-    def settings(self, *, miss_threshold: int = 3, auto_force: bool = False) -> "SessionBuilder":
-        self._miss_threshold = miss_threshold
+    def settings(self, *, auto_force: bool = False) -> "SessionBuilder":
         self._auto_force = auto_force
         return self
 
@@ -83,7 +81,7 @@ class SessionBuilder:
         logic.replace_participants(session, self._participants)
         if self._organizers:
             logic.configure_organizers(session, self._organizer_mode, self._organizers, self._active_organizers)
-        logic.save_settings(session, self._miss_threshold, self._auto_force)
+        logic.save_settings(session, self._auto_force)
         for name in self._excluded:
             logic.set_excluded(session, name, True)
         for name, team in self._forced.items():

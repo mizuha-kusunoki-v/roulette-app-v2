@@ -55,7 +55,6 @@ class ParticipantStatus(BaseModel):
 
 
 class Settings(BaseModel):
-    miss_threshold: int
     enable_auto_force: bool
     forced_limit: int  # 手動強制にできる最大人数
 
@@ -118,7 +117,6 @@ class SaveOrganizersRequest(BaseModel):
 
 
 class SaveSettingsRequest(BaseModel):
-    miss_threshold: int
     enable_auto_force: bool
 
 

@@ -105,7 +105,6 @@ def _participants(session: RouletteState) -> List[ParticipantStatus]:
 
 def _settings(session: RouletteState) -> Settings:
     return Settings(
-        miss_threshold=session.miss_threshold,
         enable_auto_force=session.enable_auto_force,
         forced_limit=forced_players_limit(session),
     )

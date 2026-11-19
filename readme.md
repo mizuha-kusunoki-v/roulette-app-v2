@@ -178,7 +178,7 @@ PAIR_PENALTY = 1.0
 | POST | `/participants/forced` | 手動強制の設定・チーム指定・解除 |
 | POST | `/participants/excluded` | 除外の切り替え |
 | PUT | `/organizers` | 主催モードと主催（候補と選択）を保存 |
-| PUT | `/settings` | 抽選設定（救済閾値・自動強制）を保存 |
+| PUT | `/settings` | 抽選設定（自動強制の ON/OFF）を保存 |
 | POST | `/draw` | 抽選を実行 |
 | POST | `/presentation_complete` | スロット演出完了を通知 |
 | DELETE | `/history/{round_id}` | 指定した抽選履歴を削除 |

@@ -740,10 +740,6 @@
       },
       "SaveSettingsRequest": {
         "properties": {
-          "miss_threshold": {
-            "type": "integer",
-            "title": "Miss Threshold"
-          },
           "enable_auto_force": {
             "type": "boolean",
             "title": "Enable Auto Force"
@@ -751,7 +747,6 @@
         },
         "type": "object",
         "required": [
-          "miss_threshold",
           "enable_auto_force"
         ],
         "title": "SaveSettingsRequest"
@@ -916,10 +911,6 @@
       },
       "Settings": {
         "properties": {
-          "miss_threshold": {
-            "type": "integer",
-            "title": "Miss Threshold"
-          },
           "enable_auto_force": {
             "type": "boolean",
             "title": "Enable Auto Force"
@@ -931,7 +922,6 @@
         },
         "type": "object",
         "required": [
-          "miss_threshold",
           "enable_auto_force",
           "forced_limit"
         ],

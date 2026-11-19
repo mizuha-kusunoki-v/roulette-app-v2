@@ -61,7 +61,6 @@ class RouletteState(BaseModel):
     participants: List[Participant] = []
     organizer_mode: OrganizerMode = "single"
     organizers: List[Organizer] = []
-    miss_threshold: int = 3
     enable_auto_force: bool = False
     # 抽選の履歴。最新の回、その前の回、進み具合 (logic.phase) はここから取り出す
     history: List[Round] = []

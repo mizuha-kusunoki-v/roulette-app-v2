@@ -25,7 +25,6 @@ def setup_session(
     mode: DrawMode = "standard_4",
     *,
     auto_force: bool = False,
-    miss_threshold: int = 3,
     excluded: Sequence[str] = (),
     forced: Sequence[str] = (),
     forced_teams: Dict[str, str] | None = None,
@@ -38,7 +37,7 @@ def setup_session(
         SessionBuilder()
         .participants(n)
         .organizers_for(mode)
-        .settings(miss_threshold=miss_threshold, auto_force=auto_force)
+        .settings(auto_force=auto_force)
         .excluded(*excluded)
     )
     teams = forced_teams or {}
@@ -127,7 +126,6 @@ class Scenario:
     n: int
     mode: DrawMode
     auto_force: bool = False
-    miss_threshold: int = 3
     excluded: List[str] = field(default_factory=list)
     forced: List[str] = field(default_factory=list)
     forced_teams: Dict[str, str] = field(default_factory=dict)
