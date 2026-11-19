@@ -18,8 +18,12 @@ const AdminApp = () => {
 
   const handleReset = async () => {
     if (isLocked) return;
-    await resetState();
-    await reload();
+    try {
+      await resetState();
+      reload();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "リセットに失敗しました。");
+    }
   };
 
   if (!session) return <p>Loading...</p>;

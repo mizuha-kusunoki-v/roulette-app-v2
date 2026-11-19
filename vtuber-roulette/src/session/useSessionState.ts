@@ -39,9 +39,14 @@ export function useSessionState() {
     setState((current) => acceptNewer(current, incoming));
   }, []);
 
-  // 操作のあとなどに、状態を読み直す。応答が WebSocket の新しい状態より遅れて届いても、捨てられる
+  // 操作のあとなどに、状態を読み直す。応答が WebSocket の新しい状態より遅れて届いても、捨てられる。
+  // 失敗しても例外にしない: WebSocket が繋がっていれば次の変更で、切れていれば繋ぎ直したときに読み直す
   const refresh = useCallback(async () => {
-    accept(await fetchSession());
+    try {
+      accept(await fetchSession());
+    } catch {
+      // 上のとおり、ここで読めなくても追いつく
+    }
   }, [accept]);
 
   useEffect(() => {

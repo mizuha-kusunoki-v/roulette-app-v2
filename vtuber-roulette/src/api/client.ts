@@ -4,6 +4,15 @@ import { apiUrl } from "./endpoint";
 
 type Schemas = components["schemas"];
 
+// サーバーに届かなかった (止まっている、繋がらない) ときの fetch の失敗を、画面に出せる文言にする
+async function request(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(apiUrl(path), init);
+  } catch {
+    throw new Error("サーバーに接続できません。");
+  }
+}
+
 async function ensureOk(res: Response) {
   if (res.ok) return;
 
@@ -19,7 +28,7 @@ async function ensureOk(res: Response) {
 
 // 本文の型は OpenAPI から生成した型に合わせる。形がずれると型チェックで失敗する
 async function send<T>(method: "POST" | "PUT", path: string, body: T) {
-  const res = await fetch(apiUrl(path), {
+  const res = await request(path, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -28,7 +37,7 @@ async function send<T>(method: "POST" | "PUT", path: string, body: T) {
 }
 
 export async function fetchSession(): Promise<SessionState> {
-  const res = await fetch(apiUrl("/session"));
+  const res = await request("/session");
   await ensureOk(res);
   return res.json();
 }
@@ -60,12 +69,12 @@ export const saveSettings = (missThreshold: number, enableAutoForce: boolean) =>
 export const draw = (mode: DrawMode) => send<Schemas["DrawRequest"]>("POST", "/draw", { mode });
 
 export async function resetState() {
-  const res = await fetch(apiUrl("/reset"), { method: "POST" });
+  const res = await request("/reset", { method: "POST" });
   await ensureOk(res);
 }
 
 export async function deleteHistoryRecord(roundId: string) {
-  const res = await fetch(apiUrl(`/history/${encodeURIComponent(roundId)}`), {
+  const res = await request(`/history/${encodeURIComponent(roundId)}`, {
     method: "DELETE",
   });
   await ensureOk(res);

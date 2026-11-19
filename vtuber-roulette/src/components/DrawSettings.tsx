@@ -15,8 +15,12 @@ export const DrawSettings = ({ settings, onUpdated }: Props) => {
   useEffect(() => { setAutoForce(settings.enable_auto_force); }, [settings.enable_auto_force]);
 
   const save = async () => {
-    await saveSettings(threshold, autoForce);
-    await onUpdated();
+    try {
+      await saveSettings(threshold, autoForce);
+      onUpdated();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "抽選設定の保存に失敗しました。");
+    }
   };
 
   return (

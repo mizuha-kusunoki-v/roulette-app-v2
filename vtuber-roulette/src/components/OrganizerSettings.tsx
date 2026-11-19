@@ -63,11 +63,15 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
   };
 
   const save = async () => {
-    await saveOrganizers(
-      mode,
-      hosts.map((name, i) => ({ name, active: selectedIndices.includes(i) })),
-    );
-    await onUpdated();
+    try {
+      await saveOrganizers(
+        mode,
+        hosts.map((name, i) => ({ name, active: selectedIndices.includes(i) })),
+      );
+      onUpdated();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "主催設定の保存に失敗しました。");
+    }
   };
 
   const exportCsv = () => {
