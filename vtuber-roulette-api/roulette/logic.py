@@ -55,11 +55,14 @@ def find_participant(session: RouletteState, name: str) -> Participant | None:
 
 
 def _players_of_round(session: RouletteState, back: int) -> List[str]:
-    """後ろから back 番目 (0 が最新) の回に出た人のうち、今も参加者にいる人。"""
+    """後ろから back 番目 (0 が最新) の回に出た人のうち、今も参加者にいる人 (名前)。
+
+    ID で照らし合わせるので、消して同じ名前で入れ直した人は含まない (別の参加者)。
+    """
     if len(session.history) <= back:
         return []
-    current = set(participant_names(session))
-    return [p for p in session.history[-1 - back].selected if p in current]
+    name_of = {p.id: p.name for p in session.participants}
+    return [name_of[i] for i in session.history[-1 - back].selected if i in name_of]
 
 
 def last_round_players(session: RouletteState) -> List[str]:
@@ -357,50 +360,64 @@ def select_players(session: RouletteState, mode: DrawMode) -> Selection:
     return _assign_teams(c, chosen)
 
 
-def build_result(mode: DrawMode, selection: Selection, organizers: List[str]) -> RouletteResult:
-    """選ばれた人と主催 (organizers、選ばれている順) をチームに分ける。"""
-    picked = selection.players
-
-    def result(*teams: tuple[str, List[str]]) -> RouletteResult:
-        return RouletteResult(kind=mode, teams=[ResultTeam(label=label, players=players) for label, players in teams])
-
+def _lineup(mode: DrawMode, picked: List[str], organizers: List[str]) -> List[tuple[str, List[str]]]:
+    """選ばれた人 (picked、チームA → チームB の順) と主催をチームに分ける。[(チーム名, 顔ぶれ)]"""
     if mode == "standard_3":
-        return result(("チームA", organizers[:1] + picked[:1]), ("チームB", picked[1:3]))
+        return [("チームA", organizers[:1] + picked[:1]), ("チームB", picked[1:3])]
     if mode == "standard_4":
-        return result(("チームA", picked[0:2]), ("チームB", picked[2:4]))
+        return [("チームA", picked[0:2]), ("チームB", picked[2:4])]
     if mode == "hosts_vs_duo":
-        return result(("主催チーム", organizers[:2]), ("挑戦者チーム", picked[:2]))
+        return [("主催チーム", organizers[:2]), ("挑戦者チーム", picked[:2])]
     # hosts_split_pairs
-    return result(
+    return [
         (f"{organizers[0]}チーム", [organizers[0], picked[0]]),
         (f"{organizers[1]}チーム", [organizers[1], picked[1]]),
+    ]
+
+
+def build_result(mode: DrawMode, selection: Selection, organizers: List[str]) -> RouletteResult:
+    """表示用のチーム分け (名前)。organizers は選ばれている順。"""
+    return RouletteResult(
+        kind=mode,
+        teams=[ResultTeam(label=label, players=players) for label, players in _lineup(mode, selection.players, organizers)],
     )
 
 
-def compute_matchup_key(result: RouletteResult) -> str:
+def compute_matchup_key(teams: List[List[str]]) -> str:
     """チーム構成をチーム順不問・選手順不問のキーに変換する。"""
-    team_keys = sorted("|".join(sorted(team.players)) for team in result.teams)
+    team_keys = sorted("|".join(sorted(team)) for team in teams)
     return "||".join(team_keys)
 
 
+def matchup_key(session: RouletteState, mode: DrawMode, selection: Selection, organizers: List[str]) -> str:
+    """対戦カードのキー。参加者は ID で表す (消して入れ直した人との組み合わせは別のカード)。"""
+    id_of = {p.name: p.id for p in session.participants}
+    picked = [id_of[p] for p in selection.players]
+    return compute_matchup_key([players for _, players in _lineup(mode, picked, organizers)])
+
+
 def new_round(
+    session: RouletteState,
     *,
     round_id: str,
     drawn_at: str,
-    result: RouletteResult,
+    mode: DrawMode,
     selection: Selection,
     organizers: List[str],
-    participants: List[str],
 ) -> Round:
+    """今の参加者で、selection (名前) を記録する 1 回分を作る。人は ID で記録する。"""
+    id_of = {p.name: p.id for p in session.participants}
     return Round(
         round_id=round_id,
         drawn_at=drawn_at,
-        result=result,
-        selected=selection.players,
+        result=build_result(mode, selection, organizers),
+        selected=[id_of[p] for p in selection.players],
         organizers=list(organizers),
-        participants=list(participants),
+        participants=[p.id for p in session.participants],
+        names={p.id: p.name for p in session.participants},
         # 選ばれた人の並び順 (チームA → チームB) にそろえる
-        reasons={p: selection.reasons[p] for p in selection.players},
+        reasons={id_of[p]: selection.reasons[p] for p in selection.players},
+        matchup=matchup_key(session, mode, selection, organizers),
     )
 
 
@@ -412,7 +429,7 @@ EMPTY_TALLY = Tally(participation_counts={}, miss_counts={}, pair_counts={})
 
 
 def count_round(tally: Tally, record: Round) -> Tally:
-    """集計に 1 回分の記録を足した集計を返す。その回の参加者だけが数えられる。"""
+    """集計に 1 回分の記録を足した集計を返す。その回の参加者だけが数えられる。人は ID で数える。"""
     picked = set(record.selected)
     participation = dict(tally.participation_counts)
     miss = dict(tally.miss_counts)
@@ -423,8 +440,7 @@ def count_round(tally: Tally, record: Round) -> Tally:
         else:
             miss[p] = miss.get(p, 0) + 1
     pairs = dict(tally.pair_counts)
-    key = compute_matchup_key(record.result)
-    pairs[key] = pairs.get(key, 0) + 1
+    pairs[record.matchup] = pairs.get(record.matchup, 0) + 1
     return Tally(participation_counts=participation, miss_counts=miss, pair_counts=pairs)
 
 
@@ -441,18 +457,18 @@ def count_history(history: List[Round]) -> Tally:
 
 
 def _current_tally(session: RouletteState) -> Tally:
+    """保存している集計 (名前で持つ) を、ID で数える形にする。"""
     return Tally(
-        participation_counts=session.participation_counts,
-        miss_counts=session.miss_counts,
+        participation_counts={p.id: session.participation_counts.get(p.name, 0) for p in session.participants},
+        miss_counts={p.id: session.miss_counts.get(p.name, 0) for p in session.participants},
         pair_counts=session.pair_counts,
     )
 
 
 def _store_tally(session: RouletteState, tally: Tally) -> None:
-    """集計を状態に入れる。参加回数とミス回数は、今の参加者の分だけを持つ。"""
-    names = participant_names(session)
-    session.participation_counts = {p: tally.participation_counts.get(p, 0) for p in names}
-    session.miss_counts = {p: tally.miss_counts.get(p, 0) for p in names}
+    """ID で数えた集計を状態に入れる。参加回数とミス回数は、今の参加者の分だけを名前で持つ。"""
+    session.participation_counts = {p.name: tally.participation_counts.get(p.id, 0) for p in session.participants}
+    session.miss_counts = {p.name: tally.miss_counts.get(p.id, 0) for p in session.participants}
     session.pair_counts = dict(tally.pair_counts)
 
 

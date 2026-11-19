@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import Dict, List, Literal
 
-from pydantic import BaseModel
+from uuid import uuid4
+
+from pydantic import BaseModel, Field
 
 OrganizerMode = Literal["single", "double"]
 DrawMode = Literal["standard_3", "standard_4", "hosts_vs_duo", "hosts_split_pairs"]
@@ -21,15 +23,20 @@ Phase = Literal["idle", "spinning", "result"]
 
 
 class Round(BaseModel):
-    """抽選の 1 回分。履歴はこれの配列で、最新の回は履歴の最後の要素。"""
+    """抽選の 1 回分。履歴はこれの配列で、最新の回は履歴の最後の要素。
+
+    人は参加者の ID で記録する (集計は ID で数える)。表示と書き出しのために、ID → 名前も記録する。
+    """
 
     round_id: str
     drawn_at: str  # ISO8601
-    result: RouletteResult
-    selected: List[str]  # 抽選で選ばれた参加者 (主催を除く)
-    organizers: List[str]  # 抽選時点の有効な主催
-    participants: List[str]  # 抽選時点の参加者
-    reasons: Dict[str, str] = {}
+    result: RouletteResult  # 表示用のチーム分け (名前)
+    selected: List[str]  # 抽選で選ばれた参加者の ID (チームA → チームB の順。主催を除く)
+    organizers: List[str]  # 抽選時点の有効な主催 (名前)
+    participants: List[str]  # 抽選時点の参加者の ID
+    names: Dict[str, str]  # 参加者の ID → 名前 (抽選時点)
+    reasons: Dict[str, str] = {}  # 参加者の ID → 選ばれた理由
+    matchup: str  # 対戦カードのキー (参加者は ID、主催は名前。重複ペア抑制で数える)
     presented: bool = False  # 演出が終わったか (次の回が足されたら、終わっていなくても済みにする)
 
 
@@ -37,6 +44,8 @@ ForcedTeam = Literal["none", "A", "B"]  # "none" はチーム指定なし
 
 
 class Participant(BaseModel):
+    # 人を見分ける ID。消して同じ名前で入れ直すと新しい ID になる (別の参加者として 0 から数える)
+    id: str = Field(default_factory=lambda: uuid4().hex)
     name: str
     forced: ForcedTeam | None = None  # None は手動強制なし
     excluded: bool = False
@@ -57,6 +66,7 @@ class RouletteState(BaseModel):
     # 抽選の履歴。最新の回、その前の回、進み具合 (logic.phase) はここから取り出す
     history: List[Round] = []
     # 履歴から数える集計 (logic._store_tally だけが書き込む。数え直すと遅いので保存する)
+    # 今の参加者の分だけを名前で持つ (今の参加者の中では名前と ID が 1 対 1)。数えるときは ID で数える
     participation_counts: Dict[str, int] = {}
     pair_counts: Dict[str, int] = {}
     miss_counts: Dict[str, int] = {}

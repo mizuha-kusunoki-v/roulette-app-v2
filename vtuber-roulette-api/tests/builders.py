@@ -93,15 +93,19 @@ class SessionBuilder:
         if self._miss is not None:
             session.miss_counts = {p: self._miss.get(p, 0) for p in logic.participant_names(session)}
         if self._last_round is not None:
+            id_of = {p.name: p.id for p in session.participants}
+            ids = [id_of[p] for p in self._last_round]
             session.history = session.history + [
                 Round(
                     round_id="builder-last-round",
                     drawn_at="2026-01-01T00:00:00+00:00",
                     result=RouletteResult(kind="standard_4", teams=[ResultTeam(label="チームA", players=list(self._last_round))]),
-                    selected=list(self._last_round),
+                    selected=ids,
                     organizers=[],
-                    participants=logic.participant_names(session),
-                    reasons={p: "random" for p in self._last_round},
+                    participants=[p.id for p in session.participants],
+                    names={p.id: p.name for p in session.participants},
+                    reasons={i: "random" for i in ids},
+                    matchup="builder-last-round",
                     presented=True,
                 )
             ]

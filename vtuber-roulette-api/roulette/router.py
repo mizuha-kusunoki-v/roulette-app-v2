@@ -14,16 +14,14 @@ from .logic import (
     active_organizers,
     add_participant,
     apply_draw_result,
-    build_result,
-    compute_matchup_key,
     configure_organizers,
     delete_history_record,
     draw_blocker,
     find_participant,
     latest_round,
     mark_presented,
+    matchup_key,
     new_round,
-    participant_names,
     phase,
     remove_participant,
     replace_participants,
@@ -136,20 +134,19 @@ def draw(req: DrawRequest, session: RouletteState = Session):
     organizers = active_organizers(session)
     for attempt in range(_PAIR_RETRY_MAX + 1):
         selection = select_players(session, req.mode)
-        result = build_result(req.mode, selection, organizers)
-        count = session.pair_counts.get(compute_matchup_key(result), 0)
+        count = session.pair_counts.get(matchup_key(session, req.mode, selection, organizers), 0)
         # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
         if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
             break
     apply_draw_result(
         session,
         new_round(
+            session,
             round_id=str(uuid.uuid4()),
             drawn_at=datetime.now(timezone.utc).isoformat(),
-            result=result,
+            mode=req.mode,
             selection=selection,
             organizers=organizers,
-            participants=participant_names(session),
         )
     )
 

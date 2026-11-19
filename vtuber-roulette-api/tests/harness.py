@@ -110,12 +110,13 @@ class RoundRecord:
 
 def latest_record() -> RoundRecord:
     r = session().history[-1]
+    name = r.names.__getitem__  # 記録は人を ID で持っているので、その回の名前に戻す
     return RoundRecord(
         round_id=r.round_id,
-        selected=list(r.selected),
-        reasons=dict(r.reasons),
+        selected=[name(i) for i in r.selected],
+        reasons={name(i): why for i, why in r.reasons.items()},
         organizers=list(r.organizers),
-        participants=list(r.participants),
+        participants=[name(i) for i in r.participants],
         teams=[list(t.players) for t in r.result.teams],
     )
 
@@ -136,11 +137,11 @@ def counts() -> Counts:
 
 def recount() -> Counts:
     """履歴を最初から数え直した集計。"""
-    tally = count_history(session().history)
-    names = logic.participant_names(session())
+    tally = count_history(session().history)  # 人は ID で数えている
+    people = session().participants
     return Counts(
-        participation={p: tally.participation_counts.get(p, 0) for p in names},
-        miss={p: tally.miss_counts.get(p, 0) for p in names},
+        participation={p.name: tally.participation_counts.get(p.id, 0) for p in people},
+        miss={p.name: tally.miss_counts.get(p.id, 0) for p in people},
         pairs=dict(tally.pair_counts),
     )
 

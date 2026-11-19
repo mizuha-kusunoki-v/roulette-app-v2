@@ -41,15 +41,16 @@ def round_view() -> RoundView:
 def test_counts_after_each_draw_equal_a_recount_of_the_history():
     rng = random.Random(0)
     setup_session(8)
+    removed: list[str] = []
     new_names = (f"N{i:02d}" for i in range(100))
-    for _ in range(60):
-        # 参加者を入れ替えながら抽選を続ける。消した名前は入れ直さない:
-        # 入れ直すと、抽選 (1 回分を足す) では参加回数が 0 から始まり、履歴を消して数え直すと昔の回も数える。
-        # この食い違いは既知 (どちらを正とするか未決) なので、ここでは扱わない
+    for _ in range(80):
+        # 参加者を入れ替えながら抽選を続ける。消した人を同じ名前で入れ直すこともある (別の参加者として扱う)
         if rng.random() < 0.3:
-            names = [p for p in harness.participants() if rng.random() > 0.1] + [next(new_names)]
-            if len(names) >= 4:
-                replace_participants(harness.session(), names)
+            kept = [p for p in harness.participants() if rng.random() > 0.15]
+            removed += [p for p in harness.participants() if p not in kept]
+            back = [removed.pop(rng.randrange(len(removed)))] if removed and rng.random() < 0.5 else [next(new_names)]
+            if len(kept + back) >= 4:
+                replace_participants(harness.session(), kept + back)
         draw("standard_4")
 
         assert harness.counts() == harness.recount()
@@ -163,3 +164,24 @@ def test_presentation_complete_for_another_round_changes_nothing():
 
     assert res == {"ok": False, "reason": "round_id_mismatch"}
     assert harness.phase() == "spinning"
+
+
+def test_a_participant_removed_and_added_again_starts_over():
+    # 消したら、その人の記録はリセット。同じ名前で入れ直しても別の参加者として 0 から数える
+    setup_session(6)
+    for _ in range(4):
+        draw("standard_4")
+    played = harness.latest_record().selected[0]
+    assert harness.participation_counts()[played] > 0
+
+    replace_participants(harness.session(), [p for p in harness.participants() if p != played])
+    replace_participants(harness.session(), harness.participants() + [played])
+
+    assert harness.participation_counts()[played] == 0
+    assert harness.miss_counts()[played] == 0
+    assert played not in harness.last_round_players()  # 前回出たのは、消す前の別の参加者
+
+    # 履歴を消して数え直しても、昔の回は数えない
+    assert delete_history_record(harness.session(), harness.round_id())
+    assert harness.participation_counts()[played] == 0
+

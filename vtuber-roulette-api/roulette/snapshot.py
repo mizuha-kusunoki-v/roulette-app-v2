@@ -58,14 +58,16 @@ def _result(result: models.RouletteResult) -> RouletteResult:
 
 
 def _record(record: models.Round) -> DrawRecord:
+    # 内部では人を ID で記録しているので、その回の名前に戻して送る
+    name = record.names.get
     return DrawRecord(
         round_id=record.round_id,
         drawn_at=record.drawn_at,
         result=_result(record.result),
-        selected=list(record.selected),
+        selected=[name(i, i) for i in record.selected],
         organizers=list(record.organizers),
-        participants=list(record.participants),
-        reasons=dict(record.reasons),
+        participants=[name(i, i) for i in record.participants],
+        reasons={name(i, i): r for i, r in record.reasons.items()},
     )
 
 
@@ -74,8 +76,8 @@ def _current_round(session: RouletteState) -> CurrentRound | None:
     if latest is None:
         return None
     grouped: Dict[str, List[str]] = {}
-    for name, reason in latest.reasons.items():
-        grouped.setdefault(reason, []).append(name)
+    for participant_id, reason in latest.reasons.items():
+        grouped.setdefault(reason, []).append(latest.names.get(participant_id, participant_id))
     selections = [SelectionGroup(reason=r, players=names) for r, names in grouped.items()]  # type: ignore[arg-type]
     return CurrentRound(round_id=latest.round_id, result=_result(latest.result), selections=selections)
 
