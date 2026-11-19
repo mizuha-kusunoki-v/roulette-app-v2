@@ -293,42 +293,6 @@
         }
       }
     },
-    "/presentation_complete": {
-      "post": {
-        "summary": "Presentation Complete",
-        "operationId": "presentation_complete_presentation_complete_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PresentationCompleteRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/history/{round_id}": {
       "delete": {
         "summary": "Delete History",
@@ -636,19 +600,6 @@
         ],
         "title": "ParticipantStatus"
       },
-      "PresentationCompleteRequest": {
-        "properties": {
-          "round_id": {
-            "type": "string",
-            "title": "Round Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "round_id"
-        ],
-        "title": "PresentationCompleteRequest"
-      },
       "ReplaceParticipantsRequest": {
         "properties": {
           "names": {
@@ -804,15 +755,6 @@
       },
       "SessionState": {
         "properties": {
-          "phase": {
-            "type": "string",
-            "enum": [
-              "idle",
-              "spinning",
-              "result"
-            ],
-            "title": "Phase"
-          },
           "revision": {
             "$ref": "#/components/schemas/Revision"
           },
@@ -879,7 +821,6 @@
         },
         "type": "object",
         "required": [
-          "phase",
           "revision",
           "presentation_duration_ms",
           "organizer_mode",

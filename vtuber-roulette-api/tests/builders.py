@@ -106,7 +106,6 @@ class SessionBuilder:
                     names={p.id: p.name for p in session.participants},
                     reasons={i: "random" for i in ids},
                     matchup="builder-last-round",
-                    presented=True,
                 )
             ]
         return session

@@ -16,10 +16,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from main import create_app
-from roulette import logic, router
+from roulette import logic
 from roulette.logic import count_history
 from roulette.models import RouletteState
-from roulette.protocol import PresentationCompleteRequest, SessionState
+from roulette.protocol import SessionState
 
 _app: FastAPI = create_app()
 
@@ -60,10 +60,6 @@ def organizer_mode() -> str:
 
 def miss_threshold() -> int:
     return session().miss_threshold
-
-
-def phase() -> str:
-    return logic.phase(session())
 
 
 def state() -> SessionState:
@@ -174,11 +170,6 @@ def before() -> Before:
 
 
 # ── 操作で進める ──────────────────────────────────────────────────────────────
-
-
-def finish_presentation() -> None:
-    """ビュワーの演出が終わったことを知らせる (POST /presentation_complete と同じ)。"""
-    router.presentation_complete(PresentationCompleteRequest(round_id=round_id() or ""), session())
 
 
 @contextmanager

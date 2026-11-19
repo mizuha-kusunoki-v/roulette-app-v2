@@ -6,12 +6,15 @@ import { OrganizerSettings } from "./components/OrganizerSettings";
 import { ParticipantManager } from "./components/ParticipantManager";
 import { RouletteController } from "./components/RouletteController";
 import { RouletteDisplay } from "./components/RouletteDisplay";
+import { useRoundAnimation } from "./session/useRoundAnimation";
 import { useSessionState } from "./session/useSessionState";
 
 const AdminApp = () => {
   const { state: session, connection, refresh: reload } = useSessionState();
 
-  const isLocked = session?.phase === "spinning";
+  // 抽選の演出が続いている間 (自分の抽選でも、ほかの管理画面の抽選でも) だけ、抽選・履歴の削除・リセットを止める。
+  // サーバーは演出を待たないので、これはこの画面だけの規則で、タイマーが終われば必ず戻る
+  const isLocked = useRoundAnimation(session) !== null;
 
   const handleReset = async () => {
     if (isLocked) return;
@@ -30,7 +33,6 @@ const AdminApp = () => {
       <OrganizerSettings
         organizerMode={session.organizer_mode}
         organizers={session.organizers}
-        disabled={isLocked}
         onUpdated={reload}
       />
 
@@ -40,7 +42,7 @@ const AdminApp = () => {
         onUpdated={reload}
       />
 
-      <DrawSettings settings={session.settings} disabled={isLocked} onUpdated={reload} />
+      <DrawSettings settings={session.settings} onUpdated={reload} />
 
       <RouletteController drawOptions={session.draw_options} locked={isLocked} onUpdated={reload} />
       <button onClick={handleReset} disabled={isLocked}>

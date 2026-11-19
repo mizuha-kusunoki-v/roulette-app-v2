@@ -16,7 +16,6 @@ from .models import (
     OrganizerMode,
     OrganizersRequired,
     Participant,
-    Phase,
     ResultTeam,
     RouletteResult,
     Round,
@@ -77,14 +76,6 @@ def previous_round_players(session: RouletteState) -> List[str]:
 
 def latest_round(session: RouletteState) -> Round | None:
     return session.history[-1] if session.history else None
-
-
-def phase(session: RouletteState) -> Phase:
-    """最新の回の進み具合。履歴が空なら idle、演出が終わっていなければ spinning、終わっていれば result。"""
-    latest = latest_round(session)
-    if latest is None:
-        return "idle"
-    return "result" if latest.presented else "spinning"
 
 
 def active_organizers(session: RouletteState) -> List[str]:
@@ -288,7 +279,7 @@ def constraint_violation(c: DrawConstraints) -> DrawBlock | None:
 def draw_blocker(session: RouletteState, mode: DrawMode) -> DrawBlock | None:
     """この mode で今は抽選できない理由を返す。抽選できるなら None。
 
-    抽選 API と画面のボタンの可否の両方がこれを使う。抽選演出中かどうかは見ない。
+    抽選 API と画面のボタンの可否の両方がこれを使う。
     """
     if mode not in modes_for_organizer_mode(session):
         return ModeNotAvailable()
@@ -453,7 +444,7 @@ def count_history(history: List[Round]) -> Tally:
 
 # ── 抽選結果と履歴の削除を状態に反映する ─────────────────────────────────────
 # 履歴から数える集計を session に書き込むのは _store_tally だけ。抽選、履歴の削除、参加者の入れ替えがこれを呼ぶ。
-# 最新の回とその進み具合は保存せず、latest_round / phase で履歴から取り出す。
+# 最新の回は保存せず、latest_round で履歴から取り出す。
 
 
 def _current_tally(session: RouletteState) -> Tally:
@@ -473,21 +464,8 @@ def _store_tally(session: RouletteState, tally: Tally) -> None:
 
 
 def apply_draw_result(session: RouletteState, new: Round) -> None:
-    # 置き換わる最新の回は、演出が終わっていなくても済みにする (その演出はもう意味がない)
-    latest = latest_round(session)
-    if latest is not None:
-        latest.presented = True
     session.history = session.history + [new]
     _store_tally(session, count_round(_current_tally(session), new))
-
-
-def mark_presented(session: RouletteState, round_id: str) -> bool:
-    """最新の回の演出が終わったことを記録する。round_id が最新の回でなければ何もせず False。"""
-    latest = latest_round(session)
-    if latest is None or latest.round_id != round_id:
-        return False
-    latest.presented = True
-    return True
 
 
 def delete_history_record(session: RouletteState, round_id: str) -> bool:

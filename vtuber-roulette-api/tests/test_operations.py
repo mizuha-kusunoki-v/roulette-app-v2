@@ -128,6 +128,6 @@ def test_reset_returns_to_the_initial_state(client):
     assert client.post("/reset").status_code == 200
 
     s = session(client)
-    assert s["participants"] == [] and s["history"] == [] and s["phase"] == "idle"
+    assert s["participants"] == [] and s["history"] == []
     assert s["settings"]["miss_threshold"] == 3
 

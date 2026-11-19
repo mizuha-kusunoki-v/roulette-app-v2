@@ -15,8 +15,6 @@ from .models import (
     TooManyForced,
 )
 
-PRESENTATION_RUNNING = "抽選演出中です"
-
 
 def describe_draw_block(block: DrawBlock) -> str:
     # 理由の種類を足したら、ここに case を足す (足さないと型チェッカーが assert_never で検出する)

@@ -59,9 +59,6 @@ export const saveSettings = (missThreshold: number, enableAutoForce: boolean) =>
 
 export const draw = (mode: DrawMode) => send<Schemas["DrawRequest"]>("POST", "/draw", { mode });
 
-export const notifyPresentationComplete = (roundId: string) =>
-  send<Schemas["PresentationCompleteRequest"]>("POST", "/presentation_complete", { round_id: roundId });
-
 export async function resetState() {
   const res = await fetch(apiUrl("/reset"), { method: "POST" });
   await ensureOk(res);

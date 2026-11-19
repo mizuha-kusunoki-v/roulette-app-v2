@@ -8,10 +8,10 @@ import random
 from dataclasses import dataclass
 from typing import List
 
-from roulette import router
+from fastapi.testclient import TestClient
+
 from roulette.logic import build_result, delete_history_record, replace_participants
 from roulette.models import Selection
-from roulette.protocol import PresentationCompleteRequest
 from tests import harness
 from tests.builders import players
 from tests.simulation import draw, setup_session
@@ -60,14 +60,12 @@ def test_deleting_the_latest_round_restores_what_was_before_it():
     setup_session(7)
     for _ in range(5):
         draw("standard_4")
-    harness.finish_presentation()
     before = round_view()
 
     latest = draw("standard_4")
     assert delete_history_record(harness.session(), harness.round_id())
 
     assert round_view() == before
-    assert harness.phase() == "result"
     assert latest.selected != []
 
 
@@ -90,7 +88,6 @@ def test_deleting_every_round_returns_to_idle():
 
     assert delete_history_record(harness.session(), harness.round_id())
 
-    assert harness.phase() == "idle"
     assert harness.round_id() is None and harness.last_round_players() == []
     assert set(harness.participation_counts().values()) == {0}
 
@@ -132,38 +129,16 @@ def test_removing_a_participant_drops_them_from_the_latest_rounds():
     assert harness.counts() == harness.recount()
 
 
-def test_phase_follows_the_latest_round():
-    setup_session(6)
-    assert harness.phase() == "idle"
-
-    draw("standard_4")
-    assert harness.phase() == "spinning"
-
-    harness.finish_presentation()
-    assert harness.phase() == "result"
-
-
-def test_a_round_replaced_by_a_new_draw_counts_as_presented():
-    # 演出が終わる前に次の抽選をした場合 (API を直接呼ぶなど)。最新の回を消すと、置き換わった回の結果表示に戻る
+def test_a_round_can_be_deleted_right_after_the_draw():
+    # 抽選は出した時点で確定する。演出が終わるのを待たないので、すぐ消せる
     setup_session(6)
     draw("standard_4")
-    draw("standard_4")
+    round_id = harness.round_id()
 
-    assert delete_history_record(harness.session(), harness.round_id())
+    res = TestClient(harness.app()).delete(f"/history/{round_id}")
 
-    assert harness.phase() == "result"
-
-
-def test_presentation_complete_for_another_round_changes_nothing():
-    setup_session(6)
-    draw("standard_4")
-    old = harness.round_id()
-    draw("standard_4")
-
-    res = router.presentation_complete(PresentationCompleteRequest(round_id=old), harness.session())
-
-    assert res == {"ok": False, "reason": "round_id_mismatch"}
-    assert harness.phase() == "spinning"
+    assert res.status_code == 200
+    assert harness.history_round_ids() == []
 
 
 def test_a_participant_removed_and_added_again_starts_over():

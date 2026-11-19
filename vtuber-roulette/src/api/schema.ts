@@ -140,23 +140,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/presentation_complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Presentation Complete */
-        post: operations["presentation_complete_presentation_complete_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/history/{round_id}": {
         parameters: {
             query?: never;
@@ -295,11 +278,6 @@ export interface components {
             /** Due */
             due: boolean;
         };
-        /** PresentationCompleteRequest */
-        PresentationCompleteRequest: {
-            /** Round Id */
-            round_id: string;
-        };
         /** ReplaceParticipantsRequest */
         ReplaceParticipantsRequest: {
             /** Names */
@@ -358,11 +336,6 @@ export interface components {
         };
         /** SessionState */
         SessionState: {
-            /**
-             * Phase
-             * @enum {string}
-             */
-            phase: "idle" | "spinning" | "result";
             revision: components["schemas"]["Revision"];
             /** Presentation Duration Ms */
             presentation_duration_ms: number;
@@ -670,39 +643,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DrawRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    presentation_complete_presentation_complete_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PresentationCompleteRequest"];
             };
         };
         responses: {

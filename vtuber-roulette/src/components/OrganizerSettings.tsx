@@ -7,11 +7,10 @@ const MAX_ORGANIZERS = 10;
 interface Props {
   organizerMode: OrganizerMode;
   organizers: Organizer[];
-  disabled: boolean;
   onUpdated: () => void;
 }
 
-export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, disabled, onUpdated }: Props) => {
+export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, onUpdated }: Props) => {
   // 保存済みの主催。編集中の値 (hosts, selectedIndices) はこの画面の中だけで持ち、保存で送る
   const organizers = savedOrganizers.map((o) => o.name);
   const activeIndices = savedOrganizers.flatMap((o, i) => (o.active ? [i] : []));
@@ -31,7 +30,6 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
 
   const requiredCount = mode === "double" ? 2 : 1;
   const canSave =
-    !disabled &&
     selectedIndices.length === requiredCount &&
     selectedIndices.every((i) => i >= 0 && i < hosts.length);
 
@@ -102,7 +100,6 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
             setMode("single");
             setSelectedIndices(selectedIndices.slice(0, 1));
           }}
-          disabled={disabled}
         />
         主催1人
       </label>
@@ -113,7 +110,6 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
           name="organizerMode"
           checked={mode === "double"}
           onChange={() => setMode("double")}
-          disabled={disabled}
         />
         主催2人
       </label>
@@ -124,12 +120,12 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addHost()}
           placeholder="主催名を入力"
-          disabled={disabled || hosts.length >= MAX_ORGANIZERS}
+          disabled={hosts.length >= MAX_ORGANIZERS}
         />
         {" "}
         <button
           onClick={addHost}
-          disabled={disabled || !newName.trim() || hosts.length >= MAX_ORGANIZERS}
+          disabled={!newName.trim() || hosts.length >= MAX_ORGANIZERS}
         >
           追加
         </button>
@@ -142,9 +138,7 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
       <ul style={{ marginTop: 8 }}>
         {hosts.map((name, i) => {
           const checked = selectedIndices.includes(i);
-          const checkDisabled =
-            disabled ||
-            (!checked && mode === "double" && selectedIndices.length >= 2);
+          const checkDisabled = !checked && mode === "double" && selectedIndices.length >= 2;
 
           return (
             <li key={i}>
@@ -160,7 +154,7 @@ export const OrganizerSettings = ({ organizerMode, organizers: savedOrganizers, 
                 {name}
               </label>
               {" "}
-              <button onClick={() => removeHost(i)} disabled={disabled}>
+              <button onClick={() => removeHost(i)}>
                 削除
               </button>
             </li>

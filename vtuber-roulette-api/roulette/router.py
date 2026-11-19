@@ -19,10 +19,8 @@ from .logic import (
     draw_blocker,
     find_participant,
     latest_round,
-    mark_presented,
     matchup_key,
     new_round,
-    phase,
     remove_participant,
     replace_participants,
     save_settings,
@@ -35,7 +33,6 @@ from .messages import describe_draw_block, forced_limit_exceeded
 from .protocol import (
     DrawRequest,
     ParticipantRequest,
-    PresentationCompleteRequest,
     ReplaceParticipantsRequest,
     Revision,
     SaveOrganizersRequest,
@@ -156,17 +153,8 @@ def draw(req: DrawRequest, session: RouletteState = Session):
     return {"round_id": latest.round_id if latest else None}
 
 
-@router.post("/presentation_complete")
-def presentation_complete(req: PresentationCompleteRequest, session: RouletteState = Session):
-    if not mark_presented(session, req.round_id):
-        return {"ok": False, "reason": "round_id_mismatch"}
-    return {"ok": True}
-
-
 @router.delete("/history/{round_id}")
 def delete_history(round_id: str, session: RouletteState = Session):
-    if phase(session) == "spinning":
-        raise HTTPException(status_code=400, detail="抽選演出中は削除できません")
     if not delete_history_record(session, round_id):
         raise HTTPException(status_code=404, detail="指定した抽選結果が見つかりません")
     return {"ok": True}

@@ -14,10 +14,9 @@ from .logic import (
     due_players,
     latest_round,
     modes_for_organizer_mode,
-    phase,
     previous_round_players,
 )
-from .messages import PRESENTATION_RUNNING, describe_draw_block
+from .messages import describe_draw_block
 from . import models
 from .models import DrawMode, RouletteState
 from .protocol import (
@@ -44,11 +43,8 @@ def _forced_team(p: models.Participant) -> ForcedTeam | None:
 
 
 def _draw_option(session: RouletteState, mode: DrawMode) -> DrawOption:
-    if phase(session) == "spinning":
-        reason: str | None = PRESENTATION_RUNNING
-    else:
-        block = draw_blocker(session, mode)
-        reason = None if block is None else describe_draw_block(block)
+    block = draw_blocker(session, mode)
+    reason = None if block is None else describe_draw_block(block)
     return DrawOption(mode=mode, available=reason is None, unavailable_reason=reason)
 
 
@@ -115,7 +111,6 @@ def _settings(session: RouletteState) -> Settings:
 
 def build_session_state(session: RouletteState, revision: Revision) -> SessionState:
     return SessionState(
-        phase=phase(session),
         revision=revision,
         presentation_duration_ms=PRESENTATION_DURATION_MS,
         organizer_mode=session.organizer_mode,

@@ -4,11 +4,10 @@ import { SessionState } from "../types";
 
 interface Props {
   settings: SessionState["settings"];
-  disabled: boolean;
   onUpdated: () => void;
 }
 
-export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
+export const DrawSettings = ({ settings, onUpdated }: Props) => {
   const [threshold, setThreshold] = useState(settings.miss_threshold);
   const [autoForce, setAutoForce] = useState(settings.enable_auto_force);
 
@@ -33,7 +32,6 @@ export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
             max={20}
             value={threshold}
             onChange={(e) => setThreshold(Math.max(1, Number(e.target.value)))}
-            disabled={disabled}
             style={{ width: 60, marginLeft: 8 }}
           />
           回
@@ -49,7 +47,6 @@ export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
             type="checkbox"
             checked={autoForce}
             onChange={(e) => setAutoForce(e.target.checked)}
-            disabled={disabled}
           />
           {" "}
           参加回数の中央値乖離による自動強制を有効にする
@@ -59,7 +56,7 @@ export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
         </p>
       </div>
 
-      <button onClick={save} disabled={disabled} style={{ marginTop: 12 }}>
+      <button onClick={save} style={{ marginTop: 12 }}>
         抽選設定を保存
       </button>
     </div>

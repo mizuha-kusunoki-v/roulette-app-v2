@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 DrawMode = Literal["standard_3", "standard_4", "hosts_vs_duo", "hosts_split_pairs"]
 OrganizerMode = Literal["single", "double"]
-Phase = Literal["idle", "spinning", "result"]
 SelectionReason = Literal["manual_check", "miss_3", "median_gap", "random", "exception_prev_round"]
 ForcedTeam = Literal["any", "A", "B"]
 
@@ -87,7 +86,6 @@ class Revision(BaseModel):
 
 
 class SessionState(BaseModel):
-    phase: Phase
     revision: Revision
     presentation_duration_ms: int  # 抽選演出の長さ。ビュワーの演出と、管理画面の一時的な操作ロックがこの長さを使う
     organizer_mode: OrganizerMode
@@ -134,7 +132,3 @@ class SaveSettingsRequest(BaseModel):
 
 class DrawRequest(BaseModel):
     mode: DrawMode
-
-
-class PresentationCompleteRequest(BaseModel):
-    round_id: str

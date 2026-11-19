@@ -19,9 +19,6 @@ class RouletteResult(BaseModel):
     teams: List[ResultTeam]
 
 
-Phase = Literal["idle", "spinning", "result"]
-
-
 class Round(BaseModel):
     """抽選の 1 回分。履歴はこれの配列で、最新の回は履歴の最後の要素。
 
@@ -37,7 +34,6 @@ class Round(BaseModel):
     names: Dict[str, str]  # 参加者の ID → 名前 (抽選時点)
     reasons: Dict[str, str] = {}  # 参加者の ID → 選ばれた理由
     matchup: str  # 対戦カードのキー (参加者は ID、主催は名前。重複ペア抑制で数える)
-    presented: bool = False  # 演出が終わったか (次の回が足されたら、終わっていなくても済みにする)
 
 
 ForcedTeam = Literal["none", "A", "B"]  # "none" はチーム指定なし
@@ -63,7 +59,7 @@ class RouletteState(BaseModel):
     organizers: List[Organizer] = []
     miss_threshold: int = 3
     enable_auto_force: bool = False
-    # 抽選の履歴。最新の回、その前の回、進み具合 (logic.phase) はここから取り出す
+    # 抽選の履歴。最新の回、その前の回はここから取り出す
     history: List[Round] = []
     # 履歴から数える集計 (logic._store_tally だけが書き込む。数え直すと遅いので保存する)
     # 今の参加者の分だけを名前で持つ (今の参加者の中では名前と ID が 1 対 1)。数えるときは ID で数える

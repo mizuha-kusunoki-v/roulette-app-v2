@@ -1,60 +1,35 @@
 import { useEffect, useRef, useState } from "react";
-import { notifyPresentationComplete } from "../api/client";
+import { useRoundAnimation } from "../session/useRoundAnimation";
 import { useSessionState } from "../session/useSessionState";
 import { getDisplayTeams } from "../utils/resultDisplay";
 import "./roulette.css";
 
-const ANIMATION_DURATION_MS = 5000;
+const SLOT_INTERVAL_MS = 80;
 
 export const ResultViewerPage = () => {
-  const { state: serverState } = useSessionState();
+  const { state } = useSessionState();
+  const animatingRoundId = useRoundAnimation(state);
   const [displayName, setDisplayName] = useState<string>("");
-  const [animating, setAnimating] = useState(false);
 
-  const lastRoundIdRef = useRef<string | null>(null);
-  const completedRoundIdRef = useRef<string | null>(null);
-  const intervalRef = useRef<number | null>(null);
+  // 演出の間に入れ替える名前は、そのときの参加者から選ぶ
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
-    return () => {
-      if (intervalRef.current !== null) clearInterval(intervalRef.current);
-    };
-  }, []);
+    if (animatingRoundId === null) return;
+    const id = window.setInterval(() => {
+      const names = stateRef.current?.participants.map((p) => p.name) ?? [];
+      if (names.length > 0) setDisplayName(names[Math.floor(Math.random() * names.length)]);
+    }, SLOT_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [animatingRoundId]);
 
-  useEffect(() => {
-    const round = serverState?.current_round;
-    if (!serverState || !round) return;
-    if (serverState.phase !== "spinning") return;
-    if (round.round_id === lastRoundIdRef.current) return;
+  if (!state) return <p>Loading...</p>;
 
-    lastRoundIdRef.current = round.round_id;
-    const roundId = round.round_id;
-    const candidates = serverState.participants.map((p) => p.name);
-
-    if (intervalRef.current !== null) clearInterval(intervalRef.current);
-
-    setAnimating(true);
-    const startTime = Date.now();
-
-    intervalRef.current = window.setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      if (elapsed >= ANIMATION_DURATION_MS) {
-        clearInterval(intervalRef.current!);
-        intervalRef.current = null;
-        setAnimating(false);
-        if (completedRoundIdRef.current !== roundId) {
-          completedRoundIdRef.current = roundId;
-          notifyPresentationComplete(roundId);
-        }
-        return;
-      }
-      setDisplayName(candidates[Math.floor(Math.random() * candidates.length)]);
-    }, 80);
-  }, [serverState]);
-
-  if (!serverState) return <p>Loading...</p>;
-
-  if (animating) {
+  // 演出中の回がリセットや削除でなくなったら、演出は出さない
+  if (animatingRoundId !== null && state.current_round?.round_id === animatingRoundId) {
     return (
       <div className="viewer-screen viewer-center">
         <div className="status-panel">抽選中...</div>
@@ -63,15 +38,7 @@ export const ResultViewerPage = () => {
     );
   }
 
-  if (serverState.phase === "spinning") {
-    return (
-      <div className="viewer-screen viewer-center">
-        <div className="status-panel">抽選中</div>
-      </div>
-    );
-  }
-
-  if (!serverState.current_round) {
+  if (!state.current_round) {
     return (
       <div className="viewer-screen viewer-center">
         <div className="status-panel">抽選結果待機中</div>
@@ -79,7 +46,7 @@ export const ResultViewerPage = () => {
     );
   }
 
-  const teams = getDisplayTeams(serverState.current_round.result, serverState.organizers);
+  const teams = getDisplayTeams(state.current_round.result, state.organizers);
 
   return (
     <div className="viewer-screen viewer-center">

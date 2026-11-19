@@ -59,12 +59,13 @@ def test_available_draw_options_match_what_the_draw_api_accepts():
             assert not draw_succeeds(mode), (seed, mode)
 
 
-def test_no_draw_is_available_while_the_presentation_runs():
+def test_draws_stay_available_right_after_a_draw():
+    # 抽選は出した時点で確定する。演出が終わるのを待たず、すぐ次の抽選ができる
     setup_session(10)
     draw("standard_4")
-    assert harness.phase() == "spinning"
 
-    assert all(not o.available for o in harness.state().draw_options)
+    assert any(o.available for o in harness.state().draw_options)
+    draw("standard_4")
 
 
 def test_state_carries_the_presentation_duration_from_the_config():
@@ -122,7 +123,7 @@ def test_session_is_served_over_http():
     session = TestClient(harness.app()).get("/session").json()
 
     assert [p["name"] for p in session["participants"]] == players(5)
-    assert session["phase"] == "idle" and session["current_round"] is None
+    assert session["current_round"] is None and session["presentation_duration_ms"] > 0
 
 
 def test_auto_forced_is_computed_from_the_current_state():

@@ -25,7 +25,7 @@ export const RouletteController = ({ drawOptions, locked, onUpdated }: Props) =>
     }
   };
 
-  // 実行できない理由はサーバーが返す。演出中はどれも実行できないので、理由は出さない
+  // 実行できない理由はサーバーが返す。演出中はこの画面で止めているだけなので、理由は出さない
   const reasons = locked
     ? []
     : Array.from(new Set(drawOptions.flatMap((o) => (o.unavailable_reason ? [o.unavailable_reason] : []))));
@@ -34,7 +34,7 @@ export const RouletteController = ({ drawOptions, locked, onUpdated }: Props) =>
     <div>
       <h2>抽選</h2>
       {drawOptions.map((option) => (
-        <button key={option.mode} onClick={() => exec(option.mode)} disabled={!option.available}>
+        <button key={option.mode} onClick={() => exec(option.mode)} disabled={locked || !option.available}>
           {MODE_LABEL[option.mode]}
         </button>
       ))}
