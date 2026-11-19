@@ -91,3 +91,33 @@ def test_pair_suppression_spreads_matchups_more_evenly(n):
     with_suppression = average_sd(10)
 
     assert with_suppression < without * 0.8, (with_suppression, without)
+
+
+# チーム A の枠の割合 (4 人抽選は 2/4、3 人抽選は 1/3)
+TEAM_A_SHARE = {"standard_4": 0.5, "standard_3": 1 / 3}
+
+
+@pytest.mark.parametrize("mode", ["standard_4", "standard_3"])
+def test_a_forced_player_without_team_lands_in_either_team(mode):
+    # チーム指定なしの手動強制は、空いている枠の割合どおりにどちらのチームにも入る
+    random.seed(0)
+    setup_session(10, mode, forced=["P00"], forced_teams={"P00": "none"})
+
+    history = run(mode, 400)
+
+    share = sum("P00" in r.team_a for r in history) / len(history)
+    assert abs(share - TEAM_A_SHARE[mode]) < 0.08, share
+
+
+@pytest.mark.parametrize("n, auto_force", [(10, False), (12, True)])
+def test_team_does_not_depend_on_why_a_player_was_chosen(n, auto_force):
+    random.seed(0)
+    setup_session(n, auto_force=auto_force)
+
+    history = run("standard_4", 400)
+
+    for reason in ("miss_3", "random"):
+        in_a = [p in r.team_a for r in history for p, why in r.reasons.items() if why == reason]
+        assert len(in_a) > 50, (reason, len(in_a))
+        assert abs(sum(in_a) / len(in_a) - 0.5) < 0.1, (reason, sum(in_a) / len(in_a))
+

@@ -75,6 +75,25 @@ class Tally:
     miss_counts: Dict[str, int]
     pair_counts: Dict[str, int]  # 対戦カード (compute_matchup_key) ごとの回数
 
+
+@dataclass(frozen=True)
+class DrawConstraints:
+    """抽選モードの制約。判定 (logic.draw_blocker) と抽選 (logic.select_players) の両方がこれを使う。"""
+
+    slots: Dict[str, int]  # チームごとの枠 {"A": n, "B": m}
+    fixed: Dict[str, List[str]]  # チーム指定ありの手動強制 {"A": [...], "B": [...]}
+    forced_any: List[str]  # チーム指定なしの手動強制
+    pool: List[str]  # 手動強制以外で枠を埋められる人 (除外中でない参加者)
+
+    @property
+    def total_slots(self) -> int:
+        return sum(self.slots.values())
+
+    @property
+    def forced(self) -> List[str]:
+        return self.fixed["A"] + self.fixed["B"] + self.forced_any
+
+
 # ── 抽選できない理由 (logic.draw_blocker が返す) ──────────────────────────────
 # 文言は持たない。利用者向けの文言は messages.py が組み立てる。
 

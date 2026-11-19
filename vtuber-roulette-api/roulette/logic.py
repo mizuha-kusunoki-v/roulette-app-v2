@@ -8,6 +8,7 @@ from draw_config import (
 )
 from .models import (
     DrawBlock,
+    DrawConstraints,
     DrawMode,
     DrawRecord,
     ModeNotAvailable,
@@ -234,21 +235,35 @@ def is_due(name: str) -> bool:
 # 判定は理由の種類と数値 (models.DrawBlock) だけを返す。利用者向けの文言は messages.py が組み立てる。
 
 
-def forced_count_by_team(forced: List[str]) -> Dict[str, int]:
-    """チームを指定した手動強制の人数。チーム指定なしは数えない。"""
-    counts = {"A": 0, "B": 0}
-    for p in forced:
-        team = state.forced_player_teams.get(p)
-        if team in counts:
-            counts[team] += 1
-    return counts
+def draw_constraints(mode: DrawMode) -> DrawConstraints:
+    forced = manual_forced_players()
 
+    def team(p: str) -> str:
+        return state.forced_player_teams.get(p, "none")
 
-def eligible_count(forced: List[str]) -> int:
-    """抽選に出られる人数 (除外中でない参加者と、除外中でも手動強制している人)。"""
-    return len(
-        {p for p in state.participants if p not in state.excluded_players} | set(forced)
+    return DrawConstraints(
+        slots=dict(zip(("A", "B"), get_team_slots(mode))),
+        fixed={t: [p for p in forced if team(p) == t] for t in ("A", "B")},
+        forced_any=[p for p in forced if team(p) not in ("A", "B")],
+        pool=[p for p in state.participants if p not in state.excluded_players and p not in forced],
     )
+
+
+def constraint_violation(c: DrawConstraints) -> DrawBlock | None:
+    """制約を満たして枠を埋められなければ、その理由を返す。
+
+    手動強制以外の候補はどのチームの枠にも入れるので、人数を数えるだけで判定できる。
+    候補が入れるチームを制限する制約を足すときは、ここを割り当ての判定に変える。
+    """
+    for team in ("A", "B"):
+        if len(c.fixed[team]) > c.slots[team]:
+            return TeamForcedOverSlots(team=team, forced=len(c.fixed[team]), slots=c.slots[team])  # type: ignore[arg-type]
+    if len(c.forced) > c.total_slots:
+        return TooManyForced(forced=len(c.forced), slots=c.total_slots)
+    eligible = len(c.forced) + len(c.pool)
+    if eligible < c.total_slots:
+        return NotEnoughParticipants(needed=c.total_slots, eligible=eligible)
+    return None
 
 
 def draw_blocker(mode: DrawMode) -> DrawBlock | None:
@@ -261,19 +276,7 @@ def draw_blocker(mode: DrawMode) -> DrawBlock | None:
     if state.organizer_mode == "double" and len(active_organizers()) < 2:
         return OrganizersRequired(required=2, active=len(active_organizers()))
 
-    team_slots = dict(zip(("A", "B"), get_team_slots(mode)))
-    total_slots = sum(team_slots.values())
-    forced = manual_forced_players()
-    for team, count in forced_count_by_team(forced).items():
-        if count > team_slots[team]:
-            return TeamForcedOverSlots(team=team, forced=count, slots=team_slots[team])
-    if len(forced) > total_slots:
-        return TooManyForced(forced=len(forced), slots=total_slots)
-
-    eligible = eligible_count(forced)
-    if eligible < total_slots:
-        return NotEnoughParticipants(needed=total_slots, eligible=eligible)
-    return None
+    return constraint_violation(draw_constraints(mode))
 
 
 # ── 抽選 ─────────────────────────────────────────────────────────────────────
@@ -281,43 +284,6 @@ def draw_blocker(mode: DrawMode) -> DrawBlock | None:
 
 class NotEnoughCandidates(Exception):
     """枠を埋められなかった。draw_blocker が先に弾くので、起きたらバグ。"""
-
-
-class _Slots:
-    """チームA・チームBの空き枠に、選んだ人と選んだ理由を詰めていく。"""
-
-    def __init__(self, team_a_slots: int, team_b_slots: int):
-        self._capacity = {"A": team_a_slots, "B": team_b_slots}
-        self._teams: Dict[str, List[str]] = {"A": [], "B": []}
-        self._reasons: Dict[str, str] = {}
-
-    def has(self, name: str) -> bool:
-        return name in self._reasons
-
-    def chosen(self) -> List[str]:
-        return list(self._reasons)
-
-    def is_full(self) -> bool:
-        return all(len(self._teams[t]) >= self._capacity[t] for t in self._teams)
-
-    def place(self, name: str, reason: str, team: str | None = None) -> None:
-        """team を指定しなければ、チームA、チームBの順に空いている方へ入れる。"""
-        if self.has(name):
-            return
-        for t in [team] if team else ["A", "B"]:
-            if len(self._teams[t]) < self._capacity[t]:
-                self._teams[t].append(name)
-                self._reasons[name] = reason
-                return
-
-    def fill(self, candidates: List[str], reason: str) -> None:
-        for name in candidates:
-            if self.is_full():
-                return
-            self.place(name, reason)
-
-    def selection(self) -> Selection:
-        return Selection(team_a=list(self._teams["A"]), team_b=list(self._teams["B"]), reasons=dict(self._reasons))
 
 
 def _shuffled(names: List[str]) -> List[str]:
@@ -331,36 +297,46 @@ def _longest_wait_first(names: List[str]) -> List[str]:
     return sorted(_shuffled(names), key=lambda p: state.miss_counts.get(p, 0), reverse=True)
 
 
-def _place_manual_forced(slots: _Slots, forced: List[str]) -> None:
-    """チーム指定のある人 (A、B の順) を先に置き、指定のない人を空いている枠に置く。"""
-    for team in ("A", "B"):
-        for p in forced:
-            if state.forced_player_teams.get(p) == team:
-                slots.place(p, "manual_check", team)
-    for p in forced:
-        if state.forced_player_teams.get(p, "none") == "none":
-            slots.place(p, "manual_check")
+def _choose_players(c: DrawConstraints) -> Dict[str, str]:
+    """誰が出るかを、優先度の高い順に決める。チームはまだ決めない。戻り値は {名前: 選ばれた理由}。
+
+    手動強制 → ミス回数の保証 → 自動強制 → ランダム → 前回参加者からの補充。
+    """
+    chosen = {p: "manual_check" for p in c.forced}
+
+    def add(candidates: List[str], reason: str) -> None:
+        for p in candidates:
+            if len(chosen) >= c.total_slots:
+                return
+            chosen.setdefault(p, reason)
+
+    # 前回出た人は、ほかの候補で埋まらないときだけ補充に使う
+    fresh = [p for p in c.pool if p not in state.last_players]
+    add(_longest_wait_first([p for p in fresh if is_due(p)]), "miss_3")
+    add(auto_forced_players(list(chosen)), "median_gap")
+    add(_shuffled([p for p in fresh if p not in chosen]), "random")
+    add(_shuffled([p for p in c.pool if p in state.last_players]), "exception_prev_round")
+    return chosen
+
+
+def _assign_teams(c: DrawConstraints, chosen: Dict[str, str]) -> Selection:
+    """チーム指定ありの手動強制を指定のチームに置き、残りはシャッフルして空いている枠に入れる。
+
+    選ばれた理由でチームが偏らないように、チーム分けは誰が出るかを決めたあとに行う。
+    """
+    teams = {t: list(c.fixed[t]) for t in ("A", "B")}
+    fixed = set(c.fixed["A"]) | set(c.fixed["B"])
+    for p in _shuffled([p for p in chosen if p not in fixed]):
+        teams["A" if len(teams["A"]) < c.slots["A"] else "B"].append(p)
+    return Selection(team_a=teams["A"], team_b=teams["B"], reasons=dict(chosen))
 
 
 def select_players(mode: DrawMode) -> Selection:
-    """枠を優先度の高い順に埋める: 手動強制 → ミス回数の保証 → 自動強制 → ランダム → 前回参加者からの補充。"""
-    slots = _Slots(*get_team_slots(mode))
-    forced = manual_forced_players()
-    _place_manual_forced(slots, forced)
-
-    # 前回出ておらず、除外されていない人 (前回出た人は、ほかの候補で埋まらないときだけ補充に使う)
-    fresh = [
-        p for p in state.participants
-        if p not in state.last_players and p not in state.excluded_players and not slots.has(p)
-    ]
-    slots.fill(_longest_wait_first([p for p in fresh if is_due(p)]), "miss_3")
-    slots.fill(auto_forced_players(slots.chosen()), "median_gap")
-    slots.fill(_shuffled([p for p in fresh if not slots.has(p)]), "random")
-    slots.fill(_shuffled([p for p in state.last_players if p not in state.excluded_players]), "exception_prev_round")
-
-    if not slots.is_full():
+    c = draw_constraints(mode)
+    chosen = _choose_players(c)
+    if len(chosen) < c.total_slots:
         raise NotEnoughCandidates()
-    return slots.selection()
+    return _assign_teams(c, chosen)
 
 
 def build_result(mode: DrawMode, selection: Selection, organizers: List[str]) -> RouletteResult:
