@@ -89,9 +89,9 @@ class SessionBuilder:
         for name, team in self._forced.items():
             logic.set_forced(session, name, team)
         if self._participation is not None:
-            session.participation_counts = {p: self._participation.get(p, 0) for p in session.participants}
+            session.participation_counts = {p: self._participation.get(p, 0) for p in logic.participant_names(session)}
         if self._miss is not None:
-            session.miss_counts = {p: self._miss.get(p, 0) for p in session.participants}
+            session.miss_counts = {p: self._miss.get(p, 0) for p in logic.participant_names(session)}
         if self._last_round is not None:
             session.last_players = list(self._last_round)
         return session

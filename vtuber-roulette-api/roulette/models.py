@@ -27,16 +27,28 @@ class DrawRecord(BaseModel):
     reasons: Dict[str, str] = {}
 
 
+ForcedTeam = Literal["none", "A", "B"]  # "none" はチーム指定なし
+
+
+class Participant(BaseModel):
+    name: str
+    forced: ForcedTeam | None = None  # None は手動強制なし
+    excluded: bool = False
+
+
+class Organizer(BaseModel):
+    name: str
+    active: bool = False  # 主催として選ばれている (主催モードの人数まで)
+
+
 class RouletteState(BaseModel):
-    participants: List[str] = []
+    # 利用者が入力した値
+    participants: List[Participant] = []
     organizer_mode: OrganizerMode = "single"
-    organizers: List[str] = []
-    selected_organizer_indices: List[int] = [0]
-    forced_players: List[str] = []
-    forced_player_teams: Dict[str, str] = {}
+    organizers: List[Organizer] = []
     miss_threshold: int = 3
     enable_auto_force: bool = False
-    excluded_players: List[str] = []
+    # 履歴から導く値 (logic._store_tally と logic._show_latest_round だけが書き込む)
     participation_counts: Dict[str, int] = {}
     pair_counts: Dict[str, int] = {}
     prev_players: List[str] = []

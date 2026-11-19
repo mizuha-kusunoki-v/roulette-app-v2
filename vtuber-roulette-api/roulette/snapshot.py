@@ -7,11 +7,10 @@ logic の関数を呼び、ここでは計算しない。
 from typing import Dict, List
 
 from .logic import (
-    active_organizers,
     auto_forced_players,
     draw_blocker,
     forced_players_limit,
-    is_due,
+    due_players,
     modes_for_organizer_mode,
 )
 from .messages import PRESENTATION_RUNNING, describe_draw_block
@@ -32,12 +31,11 @@ from .protocol import (
 )
 
 
-def _forced_team(session: RouletteState, name: str) -> ForcedTeam | None:
+def _forced_team(p: models.Participant) -> ForcedTeam | None:
     # 内部ではチーム指定なしを "none" で持つが、プロトコルでは "any" で表す (None は「強制していない」)
-    if name not in session.forced_players:
+    if p.forced is None:
         return None
-    team = session.forced_player_teams.get(name, "none")
-    return team if team in ("A", "B") else "any"
+    return p.forced if p.forced in ("A", "B") else "any"
 
 
 def _draw_option(session: RouletteState, mode: DrawMode) -> DrawOption:
@@ -79,21 +77,21 @@ def _current_round(session: RouletteState) -> CurrentRound | None:
 
 
 def _organizers(session: RouletteState) -> List[Organizer]:
-    active = set(active_organizers(session))
-    return [Organizer(name=n, active=n in active) for n in session.organizers]
+    return [Organizer(name=o.name, active=o.active) for o in session.organizers]
 
 
 def _participants(session: RouletteState) -> List[ParticipantStatus]:
     auto_forced = set(auto_forced_players(session))
+    due = due_players(session)
     return [
         ParticipantStatus(
-            name=p,
-            participation_count=session.participation_counts.get(p, 0),
-            miss_count=session.miss_counts.get(p, 0),
-            forced=_forced_team(session, p),
-            excluded=p in session.excluded_players,
-            auto_forced=p in auto_forced,
-            due=is_due(session, p),
+            name=p.name,
+            participation_count=session.participation_counts.get(p.name, 0),
+            miss_count=session.miss_counts.get(p.name, 0),
+            forced=_forced_team(p),
+            excluded=p.excluded,
+            auto_forced=p.name in auto_forced,
+            due=p.name in due,
         )
         for p in session.participants
     ]

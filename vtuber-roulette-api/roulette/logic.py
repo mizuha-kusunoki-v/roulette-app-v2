@@ -13,8 +13,10 @@ from .models import (
     DrawRecord,
     ModeNotAvailable,
     NotEnoughParticipants,
+    Organizer,
     OrganizerMode,
     OrganizersRequired,
+    Participant,
     ResultTeam,
     RouletteResult,
     RouletteState,
@@ -43,14 +45,16 @@ def sanitize_names(names: List[str], limit: int) -> List[str]:
     return unique
 
 
+def participant_names(session: RouletteState) -> List[str]:
+    return [p.name for p in session.participants]
+
+
+def find_participant(session: RouletteState, name: str) -> Participant | None:
+    return next((p for p in session.participants if p.name == name), None)
+
+
 def active_organizers(session: RouletteState) -> List[str]:
-    result = [
-        session.organizers[i]
-        for i in session.selected_organizer_indices
-        if 0 <= i < len(session.organizers)
-    ]
-    limit = 2 if session.organizer_mode == "double" else 1
-    return result[:limit]
+    return [o.name for o in session.organizers if o.active]
 
 
 def get_team_slots(mode: DrawMode) -> tuple[int, int]:
@@ -79,71 +83,58 @@ class ForcedLimitError(Exception):
         self.limit = limit
 
 
-def _drop_records_of_non_participants(session: RouletteState) -> None:
-    """参加者でなくなった人の強制・除外の設定を消し、履歴から導く値を今の参加者に合わせ直す。"""
-
-    def keep(names: List[str]) -> List[str]:
-        return [p for p in names if p in session.participants]
-
-    session.forced_players = keep(session.forced_players)[: forced_players_limit(session)]
-    session.forced_player_teams = {
-        p: session.forced_player_teams.get(p, "none") for p in session.forced_players
-    }
-    session.excluded_players = keep(session.excluded_players)
+def replace_participants(session: RouletteState, names: List[str]) -> None:
+    """参加者を names に置き換える。残る人は強制・除外の設定を引き継ぎ、消えた人の設定は一緒に消える。"""
+    kept = {p.name: p for p in session.participants}
+    session.participants = [kept.get(n) or Participant(name=n) for n in sanitize_names(names, limit=1000)]
+    # 履歴から導く値を、今の参加者に合わせ直す
     _store_tally(session, _current_tally(session))
     _show_latest_round(session)
 
 
-def replace_participants(session: RouletteState, names: List[str]) -> None:
-    session.participants = sanitize_names(names, limit=1000)
-    _drop_records_of_non_participants(session)
-
-
 def add_participant(session: RouletteState, name: str) -> None:
-    replace_participants(session, session.participants + [name])
+    replace_participants(session, participant_names(session) + [name])
 
 
 def remove_participant(session: RouletteState, name: str) -> None:
-    replace_participants(session, [p for p in session.participants if p != name])
+    replace_participants(session, [p for p in participant_names(session) if p != name])
 
 
 def set_forced(session: RouletteState, name: str, team: str | None) -> None:
     """name の手動強制を設定する。team は "none" (チーム指定なし) / "A" / "B"、None で解除。"""
-    if team is None:
-        session.forced_players = [p for p in session.forced_players if p != name]
-        session.forced_player_teams.pop(name, None)
-    else:
-        if name not in session.forced_players:
-            if len(session.forced_players) >= forced_players_limit(session):
-                raise ForcedLimitError(forced_players_limit(session))
-            session.forced_players = session.forced_players + [name]
-        session.forced_player_teams = {**session.forced_player_teams, name: team}
+    p = find_participant(session, name)
+    if p is None:
+        return
+    if team is not None and p.forced is None and len(manual_forced_players(session)) >= forced_players_limit(session):
+        raise ForcedLimitError(forced_players_limit(session))
+    p.forced = team  # type: ignore[assignment]
 
 
 def set_excluded(session: RouletteState, name: str, excluded: bool) -> None:
-    others = [p for p in session.excluded_players if p != name]
-    session.excluded_players = others + [name] if excluded else others
+    p = find_participant(session, name)
+    if p is not None:
+        p.excluded = excluded
 
 
 def configure_organizers(
     session: RouletteState,
     mode: OrganizerMode, names: List[str], active: List[str]
 ) -> None:
-    """主催の候補 (並び順どおり) と、そのうち主催として選ぶ人を設定する。"""
-    session.organizer_mode = mode
-    session.organizers = sanitize_names(names, limit=10)
-    selected = [
-        session.organizers.index(n)
-        for n in sanitize_names(active, limit=10)
-        if n in session.organizers
-    ]
-    session.selected_organizer_indices = sorted(selected)[: 2 if mode == "double" else 1]
+    """主催の候補 (並び順どおり) と、そのうち主催として選ぶ人を設定する。
 
-    # 主催 2 人モードでは手動強制の上限が下がる
-    session.forced_players = session.forced_players[: forced_players_limit(session)]
-    session.forced_player_teams = {
-        p: session.forced_player_teams.get(p, "none") for p in session.forced_players
-    }
+    選べるのは主催モードの人数まで (候補の並び順で先の人から)。
+    """
+    session.organizer_mode = mode
+    chosen = set(sanitize_names(active, limit=10))
+    limit = 2 if mode == "double" else 1
+    session.organizers = []
+    for n in sanitize_names(names, limit=10):
+        selected = n in chosen and sum(o.active for o in session.organizers) < limit
+        session.organizers.append(Organizer(name=n, active=selected))
+
+    # 主催 2 人モードでは手動強制の上限が下がる。超えた分は参加者の並び順で後ろの人から外す
+    for p in manual_forced_players(session)[forced_players_limit(session):]:
+        set_forced(session, p, None)
 
 
 def save_settings(session: RouletteState, miss_threshold: int, enable_auto_force: bool) -> None:
@@ -185,13 +176,16 @@ def auto_forced_players(session: RouletteState, already_selected: Sequence[str] 
     """
     if not session.enable_auto_force:
         return []
-    skip = set(manual_forced_players(session)) | set(session.last_players) | set(session.excluded_players) | set(already_selected)
+    skip = set(session.last_players) | set(already_selected)
     candidates = [
-        p for p in session.participants
-        if p not in skip and session.miss_counts.get(p, 0) < session.miss_threshold
+        p.name for p in session.participants
+        if p.forced is None
+        and not p.excluded
+        and p.name not in skip
+        and session.miss_counts.get(p.name, 0) < session.miss_threshold
     ]
     return compute_auto_forced_players(
-        {p: session.participation_counts.get(p, 0) for p in session.participants},
+        {p: session.participation_counts.get(p, 0) for p in participant_names(session)},
         candidates,
         median_gap=AUTO_FORCE_MEDIAN_GAP,
         max_per_draw=AUTO_FORCE_MAX_PER_DRAW,
@@ -211,18 +205,19 @@ def forced_players_limit(session: RouletteState) -> int:
 
 
 def manual_forced_players(session: RouletteState) -> List[str]:
-    """手動強制のうち、今の参加者にいる人。"""
-    return [p for p in session.forced_players if p in session.participants]
+    """手動強制している参加者 (参加者の並び順)。"""
+    return [p.name for p in session.participants if p.forced is not None]
 
 
-def is_due(session: RouletteState, name: str) -> bool:
-    """ミス回数の保証の対象か。次の抽選で、枠が足りる限り手動強制の次に優先して選ばれる。"""
-    return (
-        name in session.participants
-        and name not in session.last_players
-        and name not in session.excluded_players
-        and session.miss_counts.get(name, 0) >= session.miss_threshold
-    )
+def due_players(session: RouletteState) -> set[str]:
+    """ミス回数の保証の対象。次の抽選で、枠が足りる限り手動強制の次に優先して選ばれる。"""
+    last = set(session.last_players)
+    return {
+        p.name for p in session.participants
+        if p.name not in last
+        and not p.excluded
+        and session.miss_counts.get(p.name, 0) >= session.miss_threshold
+    }
 
 
 # ── 抽選できない理由 ─────────────────────────────────────────────────────────
@@ -230,16 +225,13 @@ def is_due(session: RouletteState, name: str) -> bool:
 
 
 def draw_constraints(session: RouletteState, mode: DrawMode) -> DrawConstraints:
-    forced = manual_forced_players(session)
-
-    def team(p: str) -> str:
-        return session.forced_player_teams.get(p, "none")
+    forced = [p for p in session.participants if p.forced is not None]
 
     return DrawConstraints(
         slots=dict(zip(("A", "B"), get_team_slots(mode))),
-        fixed={t: [p for p in forced if team(p) == t] for t in ("A", "B")},
-        forced_any=[p for p in forced if team(p) not in ("A", "B")],
-        pool=[p for p in session.participants if p not in session.excluded_players and p not in forced],
+        fixed={t: [p.name for p in forced if p.forced == t] for t in ("A", "B")},
+        forced_any=[p.name for p in forced if p.forced not in ("A", "B")],
+        pool=[p.name for p in session.participants if not p.excluded and p.forced is None],
     )
 
 
@@ -306,7 +298,8 @@ def _choose_players(session: RouletteState, c: DrawConstraints) -> Dict[str, str
 
     # 前回出た人は、ほかの候補で埋まらないときだけ補充に使う
     fresh = [p for p in c.pool if p not in session.last_players]
-    add(_longest_wait_first(session, [p for p in fresh if is_due(session, p)]), "miss_3")
+    due = due_players(session)
+    add(_longest_wait_first(session, [p for p in fresh if p in due]), "miss_3")
     add(auto_forced_players(session, list(chosen)), "median_gap")
     add(_shuffled([p for p in fresh if p not in chosen]), "random")
     add(_shuffled([p for p in c.pool if p in session.last_players]), "exception_prev_round")
@@ -426,15 +419,16 @@ def _current_tally(session: RouletteState) -> Tally:
 
 def _store_tally(session: RouletteState, tally: Tally) -> None:
     """集計を状態に入れる。参加回数とミス回数は、今の参加者の分だけを持つ。"""
-    session.participation_counts = {p: tally.participation_counts.get(p, 0) for p in session.participants}
-    session.miss_counts = {p: tally.miss_counts.get(p, 0) for p in session.participants}
+    names = participant_names(session)
+    session.participation_counts = {p: tally.participation_counts.get(p, 0) for p in names}
+    session.miss_counts = {p: tally.miss_counts.get(p, 0) for p in names}
     session.pair_counts = dict(tally.pair_counts)
 
 
 def _show_latest_round(session: RouletteState) -> None:
     """最新の回の情報 (前回・前々回の参加者、結果、選出理由、回の ID) を履歴から取り直す。"""
     history = session.history
-    current = set(session.participants)
+    current = set(participant_names(session))
 
     def alive(names: List[str]) -> List[str]:
         return [p for p in names if p in current]

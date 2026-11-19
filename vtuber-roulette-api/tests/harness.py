@@ -46,7 +46,7 @@ def use(session: RouletteState) -> RouletteState:
 
 
 def participants() -> List[str]:
-    return list(session().participants)
+    return logic.participant_names(session())
 
 
 def active_organizers() -> List[str]:
@@ -80,11 +80,11 @@ def previous_round_players() -> List[str]:
 
 
 def participation_counts() -> Dict[str, int]:
-    return {p: session().participation_counts.get(p, 0) for p in session().participants}
+    return {p: session().participation_counts.get(p, 0) for p in logic.participant_names(session())}
 
 
 def miss_counts() -> Dict[str, int]:
-    return {p: session().miss_counts.get(p, 0) for p in session().participants}
+    return {p: session().miss_counts.get(p, 0) for p in logic.participant_names(session())}
 
 
 def pair_counts() -> Dict[str, int]:
@@ -123,8 +123,8 @@ def recount() -> tuple[Dict[str, int], Dict[str, int], Dict[str, int]]:
     """履歴を最初から数え直した集計 (今の参加者の分)。"""
     tally = count_history(session().history)
     return (
-        {p: tally.participation_counts.get(p, 0) for p in session().participants},
-        {p: tally.miss_counts.get(p, 0) for p in session().participants},
+        {p: tally.participation_counts.get(p, 0) for p in logic.participant_names(session())},
+        {p: tally.miss_counts.get(p, 0) for p in logic.participant_names(session())},
         dict(tally.pair_counts),
     )
 

@@ -19,7 +19,9 @@ from .logic import (
     configure_organizers,
     delete_history_record,
     draw_blocker,
+    find_participant,
     new_record,
+    participant_names,
     remove_participant,
     replace_participants,
     save_settings,
@@ -56,7 +58,7 @@ Session = Depends(current_session)
 
 
 def _require_participant(session: RouletteState, name: str) -> None:
-    if name not in session.participants:
+    if find_participant(session, name) is None:
         raise HTTPException(status_code=404, detail=f"参加者「{name}」が見つかりません")
 
 
@@ -71,7 +73,7 @@ def post_participant_add(req: ParticipantRequest, session: RouletteState = Sessi
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="参加者名を入力してください")
-    if name in session.participants:
+    if find_participant(session, name) is not None:
         raise HTTPException(status_code=409, detail=f"参加者「{name}」はすでにいます")
     add_participant(session, name)
     return {"ok": True}
@@ -144,7 +146,7 @@ def draw(req: DrawRequest, session: RouletteState = Session):
             result=result,
             selection=selection,
             organizers=organizers,
-            participants=session.participants,
+            participants=participant_names(session),
         )
     )
 
