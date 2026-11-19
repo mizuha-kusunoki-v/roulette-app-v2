@@ -1,4 +1,4 @@
-"""プロトコル (サーバーから送る状態) のテスト。
+"""内部の状態からプロトコルの状態 (SessionState) を組み立てる処理のテスト。
 
 状態にはルールから導いた値 (抽選できるか、優先対象か) が入る。これが実際の抽選とずれると、
 画面で選べる抽選が失敗したり、選べない抽選が本当はできたりするので、実際の抽選と突き合わせる。
@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 import main
 from roulette.logic import DOUBLE_MODES, SINGLE_MODES, state
 from roulette.models import DrawMode, RouletteState
-from roulette.protocol import session_state
+from roulette.snapshot import build_session_state
 from tests.simulation import draw, players, setup_session
 
 
@@ -51,7 +51,7 @@ def draw_succeeds(mode: DrawMode) -> bool:
 def test_available_draw_options_match_what_the_draw_api_accepts():
     for seed in range(300):
         random_setup(random.Random(seed))
-        session = session_state()
+        session = build_session_state()
 
         listed = {o.mode for o in session.draw_options}
         assert listed == set(DOUBLE_MODES if state.organizer_mode == "double" else SINGLE_MODES)
@@ -67,7 +67,7 @@ def test_no_draw_is_available_while_the_presentation_runs():
     draw("standard_4")
     assert state.phase == "spinning"
 
-    assert all(not o.available for o in session_state().draw_options)
+    assert all(not o.available for o in build_session_state().draw_options)
 
 
 def test_due_matches_who_the_miss_guarantee_would_pick():
@@ -75,7 +75,7 @@ def test_due_matches_who_the_miss_guarantee_would_pick():
     state.miss_counts = {"P00": 3, "P01": 5, "P02": 2, "P03": 4, "P04": 0, "P05": 0}
     state.last_players = ["P04", "P05"]
 
-    due = {p.name for p in session_state().participants if p.due}
+    due = {p.name for p in build_session_state().participants if p.due}
 
     assert due == {"P00", "P03"}  # P01 は除外中、P02 は規定未満
 
@@ -83,7 +83,7 @@ def test_due_matches_who_the_miss_guarantee_would_pick():
 def test_forced_is_reported_per_participant():
     setup_session(4, forced=["P00", "P01", "P02"], forced_teams={"P00": "none", "P01": "A", "P02": "B"})
 
-    forced = {p.name: p.forced for p in session_state().participants}
+    forced = {p.name: p.forced for p in build_session_state().participants}
 
     assert forced == {"P00": "any", "P01": "A", "P02": "B", "P03": None}
 
@@ -92,7 +92,7 @@ def test_current_round_groups_players_by_selection_reason():
     setup_session(8, forced=["P05"])
     draw("standard_4")
 
-    current = session_state().current_round
+    current = build_session_state().current_round
 
     assert current.round_id == state.round_id
     by_reason = {g.reason: g.players for g in current.selections}
@@ -105,7 +105,7 @@ def test_previous_round_players_are_from_the_round_before_the_latest():
     before_latest = draw("standard_4")
     draw("standard_4")
 
-    assert session_state().previous_round_players == before_latest.selected
+    assert build_session_state().previous_round_players == before_latest.selected
 
 
 def test_session_is_served_over_http():

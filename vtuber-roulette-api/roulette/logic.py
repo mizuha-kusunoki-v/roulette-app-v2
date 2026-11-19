@@ -119,6 +119,17 @@ def manual_forced_players() -> List[str]:
     return [p for p in state.forced_players if p in state.participants and p not in organizers]
 
 
+def is_due(name: str) -> bool:
+    """ミス回数の保証の対象か。次の抽選で、枠が足りる限り手動強制の次に優先して選ばれる。"""
+    return (
+        name in state.participants
+        and name not in organizer_set()
+        and name not in state.last_players
+        and name not in state.excluded_players
+        and state.miss_counts.get(name, 0) >= state.miss_threshold
+    )
+
+
 def draw_blocker(mode: DrawMode) -> str | None:
     """この mode で今は抽選できない理由を返す。抽選できるなら None。
 
@@ -227,7 +238,7 @@ def select_players(mode: DrawMode):
     ]
 
     # 保証対象が枠より多いときは、長く待っている人から。同じ回数どうしは参加者リストの順で決めない
-    guaranteed = [p for p in non_prev_pool if state.miss_counts.get(p, 0) >= state.miss_threshold]
+    guaranteed = [p for p in non_prev_pool if is_due(p)]
     random.shuffle(guaranteed)
     guaranteed.sort(key=lambda p: state.miss_counts.get(p, 0), reverse=True)
     fill_slots(guaranteed, "miss_3")

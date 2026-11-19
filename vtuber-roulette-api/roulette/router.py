@@ -29,7 +29,8 @@ from .models import (
     ParticipantsRequest,
     PresentationCompleteRequest,
 )
-from .protocol import SessionState, session_state
+from .protocol import SessionState
+from .snapshot import build_session_state
 
 _PAIR_RETRY_MAX = 10
 
@@ -212,9 +213,9 @@ async def _serve(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
 
 @router.get("/session")
 def get_session() -> SessionState:
-    return session_state()
+    return build_session_state()
 
 
 @router.websocket("/ws/session")
 async def session_websocket(ws: WebSocket):
-    await _serve(ws, session_state)
+    await _serve(ws, build_session_state)
