@@ -11,6 +11,7 @@ from .models import (
     DrawConstraints,
     DrawMode,
     DrawRecord,
+    LatestRound,
     ModeNotAvailable,
     NotEnoughParticipants,
     Organizer,
@@ -53,6 +54,36 @@ def find_participant(session: RouletteState, name: str) -> Participant | None:
     return next((p for p in session.participants if p.name == name), None)
 
 
+def _players_of_round(session: RouletteState, back: int) -> List[str]:
+    """後ろから back 番目 (0 が最新) の回に出た人のうち、今も参加者にいる人。"""
+    if len(session.history) <= back:
+        return []
+    current = set(participant_names(session))
+    return [p for p in session.history[-1 - back].selected if p in current]
+
+
+def last_round_players(session: RouletteState) -> List[str]:
+    """最新の回に出た人。次の抽選では、ほかの候補で埋まらないときだけ選ばれる。"""
+    return _players_of_round(session, 0)
+
+
+def previous_round_players(session: RouletteState) -> List[str]:
+    """最新の回の 1 つ前の回に出た人 (管理画面の「前回参加者」)。"""
+    return _players_of_round(session, 1)
+
+
+def latest_round(session: RouletteState) -> LatestRound | None:
+    if not session.history:
+        return None
+    record = session.history[-1]
+    return LatestRound(
+        round_id=record.round_id,
+        result=record.result,
+        players=last_round_players(session),
+        reasons=dict(record.reasons),
+    )
+
+
 def active_organizers(session: RouletteState) -> List[str]:
     return [o.name for o in session.organizers if o.active]
 
@@ -72,7 +103,7 @@ def get_team_slots(mode: DrawMode) -> tuple[int, int]:
 # ── 操作 ─────────────────────────────────────────────────────────────────────
 # 画面からの操作で状態を変える。入力の検証 (存在しない名前など) は router が行う。
 # 操作が書き込むのは、利用者が入力した値 (参加者、強制、除外、主催、設定) だけ。
-# 履歴から導く値 (集計、前回・前々回の参加者など) は _store_tally と _show_latest_round に任せる。
+# 集計は _store_tally に任せる。最新の回は履歴から取り出すので書き込まない。
 
 
 class ForcedLimitError(Exception):
@@ -87,9 +118,8 @@ def replace_participants(session: RouletteState, names: List[str]) -> None:
     """参加者を names に置き換える。残る人は強制・除外の設定を引き継ぎ、消えた人の設定は一緒に消える。"""
     kept = {p.name: p for p in session.participants}
     session.participants = [kept.get(n) or Participant(name=n) for n in sanitize_names(names, limit=1000)]
-    # 履歴から導く値を、今の参加者に合わせ直す
+    # 集計を、今の参加者に合わせ直す
     _store_tally(session, _current_tally(session))
-    _show_latest_round(session)
 
 
 def add_participant(session: RouletteState, name: str) -> None:
@@ -176,7 +206,7 @@ def auto_forced_players(session: RouletteState, already_selected: Sequence[str] 
     """
     if not session.enable_auto_force:
         return []
-    skip = set(session.last_players) | set(already_selected)
+    skip = set(last_round_players(session)) | set(already_selected)
     candidates = [
         p.name for p in session.participants
         if p.forced is None
@@ -211,7 +241,7 @@ def manual_forced_players(session: RouletteState) -> List[str]:
 
 def due_players(session: RouletteState) -> set[str]:
     """ミス回数の保証の対象。次の抽選で、枠が足りる限り手動強制の次に優先して選ばれる。"""
-    last = set(session.last_players)
+    last = set(last_round_players(session))
     return {
         p.name for p in session.participants
         if p.name not in last
@@ -297,12 +327,13 @@ def _choose_players(session: RouletteState, c: DrawConstraints) -> Dict[str, str
             chosen.setdefault(p, reason)
 
     # 前回出た人は、ほかの候補で埋まらないときだけ補充に使う
-    fresh = [p for p in c.pool if p not in session.last_players]
+    last = set(last_round_players(session))
+    fresh = [p for p in c.pool if p not in last]
     due = due_players(session)
     add(_longest_wait_first(session, [p for p in fresh if p in due]), "miss_3")
     add(auto_forced_players(session, list(chosen)), "median_gap")
     add(_shuffled([p for p in fresh if p not in chosen]), "random")
-    add(_shuffled([p for p in c.pool if p in session.last_players]), "exception_prev_round")
+    add(_shuffled([p for p in c.pool if p in last]), "exception_prev_round")
     return chosen
 
 
@@ -405,8 +436,8 @@ def count_history(history: List[DrawRecord]) -> Tally:
 
 
 # ── 抽選結果と履歴の削除を状態に反映する ─────────────────────────────────────
-# 履歴から導く値 (集計、前回・前々回の参加者、結果、選出理由、回の ID) を session に書き込むのは、
-# _store_tally と _show_latest_round だけ。抽選、履歴の削除、参加者の入れ替えがこれを呼ぶ。
+# 履歴から数える集計を session に書き込むのは _store_tally だけ。抽選、履歴の削除、参加者の入れ替えがこれを呼ぶ。
+# 最新の回 (結果、出た人、選ばれた理由、回の ID) は保存せず、latest_round などで履歴から取り出す。
 
 
 def _current_tally(session: RouletteState) -> Tally:
@@ -425,25 +456,9 @@ def _store_tally(session: RouletteState, tally: Tally) -> None:
     session.pair_counts = dict(tally.pair_counts)
 
 
-def _show_latest_round(session: RouletteState) -> None:
-    """最新の回の情報 (前回・前々回の参加者、結果、選出理由、回の ID) を履歴から取り直す。"""
-    history = session.history
-    current = set(participant_names(session))
-
-    def alive(names: List[str]) -> List[str]:
-        return [p for p in names if p in current]
-
-    session.last_players = alive(history[-1].selected) if history else []
-    session.prev_players = alive(history[-2].selected) if len(history) > 1 else []
-    session.last_selection_reasons = dict(history[-1].reasons) if history else {}
-    session.result = history[-1].result if history else None
-    session.round_id = history[-1].round_id if history else None
-
-
 def apply_draw_result(session: RouletteState, record: DrawRecord) -> None:
     session.history = session.history + [record]
     _store_tally(session, count_round(_current_tally(session), record))
-    _show_latest_round(session)
     session.phase = "spinning"
 
 
@@ -454,6 +469,5 @@ def delete_history_record(session: RouletteState, round_id: str) -> bool:
         return False
     session.history = remaining
     _store_tally(session, count_history(remaining))
-    _show_latest_round(session)
     session.phase = "result" if remaining else "idle"
     return True

@@ -11,7 +11,9 @@ from .logic import (
     draw_blocker,
     forced_players_limit,
     due_players,
+    latest_round,
     modes_for_organizer_mode,
+    previous_round_players,
 )
 from .messages import PRESENTATION_RUNNING, describe_draw_block
 from . import models
@@ -67,13 +69,14 @@ def _record(record: models.DrawRecord) -> DrawRecord:
 
 
 def _current_round(session: RouletteState) -> CurrentRound | None:
-    if session.round_id is None or session.result is None:
+    latest = latest_round(session)
+    if latest is None:
         return None
     grouped: Dict[str, List[str]] = {}
-    for name, reason in session.last_selection_reasons.items():
+    for name, reason in latest.reasons.items():
         grouped.setdefault(reason, []).append(name)
     selections = [SelectionGroup(reason=r, players=names) for r, names in grouped.items()]  # type: ignore[arg-type]
-    return CurrentRound(round_id=session.round_id, result=_result(session.result), selections=selections)
+    return CurrentRound(round_id=latest.round_id, result=_result(latest.result), selections=selections)
 
 
 def _organizers(session: RouletteState) -> List[Organizer]:
@@ -114,6 +117,6 @@ def build_session_state(session: RouletteState) -> SessionState:
         settings=_settings(session),
         draw_options=[_draw_option(session, m) for m in modes_for_organizer_mode(session)],
         current_round=_current_round(session),
-        previous_round_players=list(session.prev_players),
+        previous_round_players=previous_round_players(session),
         history=[_record(r) for r in session.history],
     )

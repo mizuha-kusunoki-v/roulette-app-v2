@@ -1,8 +1,7 @@
-"""state への書き込みのルールを、ソースコードから確かめる。
+"""セッションへの書き込みのルールを、ソースコードから確かめる。
 
-履歴から導く値 (集計、前回・前々回の参加者、結果、選出理由、回の ID) を書き込むのは
-logic._store_tally と logic._show_latest_round だけ (logic.py の「抽選結果と履歴の削除を状態に反映する」を参照)。
-ほかの場所で書き込むと、履歴との食い違いが起きうる。
+履歴から数える集計 (参加回数・ミス回数・対戦カードの回数) を書き込むのは logic._store_tally だけ
+(logic.py の「抽選結果と履歴の削除を状態に反映する」を参照)。ほかの場所で書き込むと、履歴との食い違いが起きうる。
 """
 
 import ast
@@ -12,13 +11,8 @@ DERIVED = {
     "participation_counts",
     "miss_counts",
     "pair_counts",
-    "last_players",
-    "prev_players",
-    "last_selection_reasons",
-    "result",
-    "round_id",
 }
-WRITERS = {"_store_tally", "_show_latest_round"}
+WRITERS = {"_store_tally"}
 # セッションを表す変数名 (logic などの関数は引数 session で受け取る)
 SESSION_NAMES = {"session", "state"}
 SOURCES = sorted((Path(__file__).parent.parent / "roulette").glob("*.py"))

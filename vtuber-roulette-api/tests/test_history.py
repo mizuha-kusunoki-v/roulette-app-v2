@@ -5,6 +5,8 @@
 """
 
 import random
+from dataclasses import dataclass
+from typing import List
 
 from roulette.logic import build_result, delete_history_record, replace_participants
 from roulette.models import Selection
@@ -13,21 +15,24 @@ from tests.builders import players
 from tests.simulation import draw, setup_session
 
 
-def counts_from_history() -> tuple[dict, dict, dict]:
-    return harness.recount()
+@dataclass
+class RoundView:
+    """最新の回まわりの様子。履歴を消したあとに、消す前と同じに戻ったかを比べる。"""
+
+    counts: harness.Counts
+    last_round_players: List[str]
+    previous_round_players: List[str]
+    round_id: str | None
+    teams: List[List[str]] | None
 
 
-def counts_in_state() -> tuple[dict, dict, dict]:
-    return harness.participation_counts(), harness.miss_counts(), harness.pair_counts()
-
-
-def latest_round() -> tuple:
-    return (
-        counts_in_state(),
-        harness.last_round_players(),
-        harness.previous_round_players(),
-        harness.round_id(),
-        harness.latest_record().teams if harness.history_round_ids() else None,
+def round_view() -> RoundView:
+    return RoundView(
+        counts=harness.counts(),
+        last_round_players=harness.last_round_players(),
+        previous_round_players=harness.previous_round_players(),
+        round_id=harness.round_id(),
+        teams=harness.latest_record().teams if harness.history_round_ids() else None,
     )
 
 
@@ -45,7 +50,7 @@ def test_counts_after_each_draw_equal_a_recount_of_the_history():
                 replace_participants(harness.session(), names)
         draw("standard_4")
 
-        assert counts_in_state() == counts_from_history()
+        assert harness.counts() == harness.recount()
 
 
 def test_deleting_the_latest_round_restores_what_was_before_it():
@@ -53,12 +58,12 @@ def test_deleting_the_latest_round_restores_what_was_before_it():
     for _ in range(5):
         draw("standard_4")
     harness.finish_presentation()
-    before = latest_round()
+    before = round_view()
 
     latest = draw("standard_4")
     assert delete_history_record(harness.session(), harness.round_id())
 
-    assert latest_round() == before
+    assert round_view() == before
     assert harness.phase() == "result"
     assert latest.selected != []
 
@@ -72,7 +77,7 @@ def test_deleting_a_middle_round_recounts_from_the_rest():
     assert delete_history_record(harness.session(), middle)
 
     assert middle not in harness.history_round_ids()
-    assert counts_in_state() == counts_from_history()
+    assert harness.counts() == harness.recount()
     assert harness.last_round_players() == harness.latest_record().selected
 
 
@@ -121,5 +126,5 @@ def test_removing_a_participant_drops_them_from_the_latest_rounds():
     assert not set(gone) & set(harness.last_round_players())
     assert not set(gone) & set(harness.previous_round_players())
     assert set(harness.participation_counts()) == set(harness.participants())
-    assert counts_in_state() == counts_from_history()
+    assert harness.counts() == harness.recount()
 

@@ -8,7 +8,7 @@
 from typing import Dict, List
 
 from roulette import logic
-from roulette.models import DrawMode, OrganizerMode, RouletteState
+from roulette.models import DrawMode, DrawRecord, OrganizerMode, ResultTeam, RouletteResult, RouletteState
 from roulette.sessions import SessionFactory
 
 HOST_MODES: tuple[DrawMode, ...] = ("hosts_vs_duo", "hosts_split_pairs")
@@ -74,7 +74,7 @@ class SessionBuilder:
         return self
 
     def last_round(self, names: List[str]) -> "SessionBuilder":
-        """最新の回に出た人。画面の操作では作れないので直接入れる。"""
+        """最新の回に出た人。その人たちが出た回を 1 件、履歴に足す (集計は counts で決めた値のまま)。"""
         self._last_round = list(names)
         return self
 
@@ -93,5 +93,15 @@ class SessionBuilder:
         if self._miss is not None:
             session.miss_counts = {p: self._miss.get(p, 0) for p in logic.participant_names(session)}
         if self._last_round is not None:
-            session.last_players = list(self._last_round)
+            session.history = session.history + [
+                DrawRecord(
+                    round_id="builder-last-round",
+                    drawn_at="2026-01-01T00:00:00+00:00",
+                    result=RouletteResult(kind="standard_4", teams=[ResultTeam(label="チームA", players=list(self._last_round))]),
+                    selected=list(self._last_round),
+                    organizers=[],
+                    participants=logic.participant_names(session),
+                    reasons={p: "random" for p in self._last_round},
+                )
+            ]
         return session

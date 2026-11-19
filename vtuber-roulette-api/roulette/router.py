@@ -20,6 +20,7 @@ from .logic import (
     delete_history_record,
     draw_blocker,
     find_participant,
+    latest_round,
     new_record,
     participant_names,
     remove_participant,
@@ -151,12 +152,14 @@ def draw(req: DrawRequest, session: RouletteState = Session):
     )
 
     # 結果は /session と /ws/session で届くので、ここでは回の ID だけを返す (内部のモデルを外に出さない)
-    return {"round_id": session.round_id}
+    latest = latest_round(session)
+    return {"round_id": latest.round_id if latest else None}
 
 
 @router.post("/presentation_complete")
 def presentation_complete(req: PresentationCompleteRequest, session: RouletteState = Session):
-    if req.round_id != session.round_id:
+    latest = latest_round(session)
+    if latest is None or req.round_id != latest.round_id:
         return {"ok": False, "reason": "round_id_mismatch"}
 
     session.phase = "result"

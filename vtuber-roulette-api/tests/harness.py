@@ -66,17 +66,18 @@ def phase() -> str:
 
 
 def round_id() -> str | None:
-    return session().round_id
+    latest = logic.latest_round(session())
+    return latest.round_id if latest else None
 
 
 def last_round_players() -> List[str]:
     """最新の回に出た人 (次の抽選で休む人)。"""
-    return list(session().last_players)
+    return logic.last_round_players(session())
 
 
 def previous_round_players() -> List[str]:
     """最新の回の 1 つ前の回に出た人。"""
-    return list(session().prev_players)
+    return logic.previous_round_players(session())
 
 
 def participation_counts() -> Dict[str, int]:
@@ -119,13 +120,28 @@ def latest_record() -> RoundRecord:
     )
 
 
-def recount() -> tuple[Dict[str, int], Dict[str, int], Dict[str, int]]:
-    """履歴を最初から数え直した集計 (今の参加者の分)。"""
+@dataclass
+class Counts:
+    """今の参加者の分の集計。"""
+
+    participation: Dict[str, int]
+    miss: Dict[str, int]
+    pairs: Dict[str, int]
+
+
+def counts() -> Counts:
+    """セッションが持っている集計。"""
+    return Counts(participation=participation_counts(), miss=miss_counts(), pairs=pair_counts())
+
+
+def recount() -> Counts:
+    """履歴を最初から数え直した集計。"""
     tally = count_history(session().history)
-    return (
-        {p: tally.participation_counts.get(p, 0) for p in logic.participant_names(session())},
-        {p: tally.miss_counts.get(p, 0) for p in logic.participant_names(session())},
-        dict(tally.pair_counts),
+    names = logic.participant_names(session())
+    return Counts(
+        participation={p: tally.participation_counts.get(p, 0) for p in names},
+        miss={p: tally.miss_counts.get(p, 0) for p in names},
+        pairs=dict(tally.pair_counts),
     )
 
 
@@ -155,7 +171,7 @@ def before() -> Before:
 
 def finish_presentation() -> None:
     """ビュワーの演出が終わったことを知らせる (POST /presentation_complete と同じ)。"""
-    router.presentation_complete(PresentationCompleteRequest(round_id=session().round_id), session())
+    router.presentation_complete(PresentationCompleteRequest(round_id=round_id() or ""), session())
 
 
 @contextmanager

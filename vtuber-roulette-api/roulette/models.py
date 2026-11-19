@@ -48,15 +48,11 @@ class RouletteState(BaseModel):
     organizers: List[Organizer] = []
     miss_threshold: int = 3
     enable_auto_force: bool = False
-    # 履歴から導く値 (logic._store_tally と logic._show_latest_round だけが書き込む)
+    # 履歴から数える集計 (logic._store_tally だけが書き込む)。最新の回は履歴から取り出すので持たない
     participation_counts: Dict[str, int] = {}
     pair_counts: Dict[str, int] = {}
-    prev_players: List[str] = []
-    last_players: List[str] = []
     miss_counts: Dict[str, int] = {}
-    last_selection_reasons: Dict[str, str] = {}
-    result: RouletteResult | None = None
-    round_id: str | None = None
+    # 最新の回の進み具合 (演出中か、結果を表示しているか)。これだけは履歴からわからないので持つ
     phase: Literal["idle", "spinning", "result"] = "idle"
     history: List[DrawRecord] = []
 
@@ -77,6 +73,16 @@ class Selection:
     def players(self) -> List[str]:
         """[チームA..., チームB...] の順。"""
         return self.team_a + self.team_b
+
+
+@dataclass(frozen=True)
+class LatestRound:
+    """最新の回。履歴の最後の記録から取り出す (logic.latest_round)。"""
+
+    round_id: str
+    result: RouletteResult
+    players: List[str]  # 出た人のうち、今も参加者にいる人 (チームA → チームB の順)
+    reasons: Dict[str, str]  # 選ばれた理由 (出た人全員の分)
 
 
 @dataclass(frozen=True)
