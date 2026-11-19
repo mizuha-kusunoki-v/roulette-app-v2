@@ -11,7 +11,7 @@ import pytest
 
 from draw_config import AUTO_FORCE_MEDIAN_GAP
 from roulette import router
-from roulette.logic import state
+from tests import harness
 from tests.simulation import (
     fair_wait_bound,
     matchup_repeat_sd,
@@ -50,7 +50,7 @@ def test_nobody_waits_much_longer_than_a_fair_rotation(n, mode, seed):
 
     history = run(mode, ROUNDS)
 
-    bound = fair_wait_bound(n, mode, state.miss_threshold)
+    bound = fair_wait_bound(n, mode, harness.miss_threshold())
     assert max_miss_streak(history, players(n)) <= bound
 
 
@@ -60,7 +60,7 @@ def test_position_in_the_participant_list_does_not_decide_who_plays():
 
     run("standard_4", ROUNDS)
 
-    counts = [state.participation_counts[p] for p in players(20)]
+    counts = list(harness.participation_counts().values())
     assert max(counts) - min(counts) <= 2, counts
 
 

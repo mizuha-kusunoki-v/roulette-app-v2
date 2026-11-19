@@ -1,6 +1,7 @@
 """自動強制 (参加回数の中央値差) のルール本体のテスト。state を使わずに引数だけで確かめる。"""
 
-from roulette.logic import auto_forced_players, compute_auto_forced_players, state
+from roulette.logic import auto_forced_players, compute_auto_forced_players
+from tests import harness
 from tests.simulation import setup_session
 
 
@@ -36,9 +37,8 @@ def test_nobody_is_picked_without_participants():
 
 def test_state_wrapper_skips_forced_resting_excluded_and_due_players():
     setup_session(10, auto_force=True, miss_threshold=3, excluded=["P02"], forced=["P03"])
-    state.participation_counts = {p: (0 if p in ("P00", "P01", "P02", "P03", "P04") else 9) for p in state.participants}
-    state.last_players = ["P00"]
-    state.miss_counts = {p: (5 if p == "P01" else 0) for p in state.participants}
+    harness.set_counts(participation={p: 9 for p in ("P05", "P06", "P07", "P08", "P09")}, miss={"P01": 5})
+    harness.set_last_round_players(["P00"])
 
     # P00 は前回出た、P01 はミス回数の保証の対象、P02 は除外中、P03 は手動強制
     assert auto_forced_players() == ["P04"]

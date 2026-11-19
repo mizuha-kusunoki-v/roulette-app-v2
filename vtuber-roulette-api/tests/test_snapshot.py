@@ -10,42 +10,39 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import main
-from roulette.logic import DOUBLE_MODES, SINGLE_MODES, state
-from roulette.models import DrawMode, RouletteState
+from roulette import logic
+from roulette.logic import DOUBLE_MODES, SINGLE_MODES
+from roulette.models import DrawMode
 from roulette.snapshot import build_session_state
+from tests import harness
 from tests.simulation import draw, players, setup_session
 
 
-def snapshot() -> RouletteState:
-    return state.model_copy(deep=True)
-
-
-def restore(saved: RouletteState) -> None:
-    for name in RouletteState.model_fields:
-        setattr(state, name, getattr(saved.model_copy(deep=True), name))
-
-
 def random_setup(rng: random.Random) -> None:
+    """画面の操作で作れる状態をランダムに作る (手動強制は上限まで)。"""
     double = rng.random() < 0.4
     n = rng.randint(0, 9)
-    setup_session(n, "hosts_vs_duo" if double else "standard_4", miss_threshold=rng.randint(1, 4))
-    if double and rng.random() < 0.3:
-        state.selected_organizer_indices = [0]  # 主催を 1 人しか選んでいない
     names = players(n)
-    state.excluded_players = rng.sample(names, rng.randint(0, n))
-    state.forced_players = rng.sample(names, rng.randint(0, min(n, 5)))
-    state.forced_player_teams = {p: rng.choice(["none", "A", "B"]) for p in state.forced_players}
+    forced = rng.sample(names, rng.randint(0, min(n, 2 if double else 4)))
+    setup_session(
+        n,
+        "hosts_vs_duo" if double else "standard_4",
+        miss_threshold=rng.randint(1, 4),
+        excluded=rng.sample(names, rng.randint(0, n)),
+        forced=forced,
+        forced_teams={p: rng.choice(["none", "A", "B"]) for p in forced},
+    )
+    if double and rng.random() < 0.3:
+        logic.configure_organizers("double", ["Host1", "Host2"], ["Host1"])  # 主催を 1 人しか選んでいない
 
 
 def draw_succeeds(mode: DrawMode) -> bool:
-    saved = snapshot()
-    try:
-        draw(mode)
-        return True
-    except HTTPException:
-        return False
-    finally:
-        restore(saved)
+    with harness.rollback():
+        try:
+            draw(mode)
+            return True
+        except HTTPException:
+            return False
 
 
 def test_available_draw_options_match_what_the_draw_api_accepts():
@@ -54,7 +51,7 @@ def test_available_draw_options_match_what_the_draw_api_accepts():
         session = build_session_state()
 
         listed = {o.mode for o in session.draw_options}
-        assert listed == set(DOUBLE_MODES if state.organizer_mode == "double" else SINGLE_MODES)
+        assert listed == set(DOUBLE_MODES if session.organizer_mode == "double" else SINGLE_MODES)
         for o in session.draw_options:
             assert draw_succeeds(o.mode) == o.available, (seed, o)
             assert (o.unavailable_reason is None) == o.available
@@ -65,15 +62,15 @@ def test_available_draw_options_match_what_the_draw_api_accepts():
 def test_no_draw_is_available_while_the_presentation_runs():
     setup_session(10)
     draw("standard_4")
-    assert state.phase == "spinning"
+    assert harness.phase() == "spinning"
 
     assert all(not o.available for o in build_session_state().draw_options)
 
 
 def test_due_matches_who_the_miss_guarantee_would_pick():
     setup_session(6, miss_threshold=3, excluded=["P01"])
-    state.miss_counts = {"P00": 3, "P01": 5, "P02": 2, "P03": 4, "P04": 0, "P05": 0}
-    state.last_players = ["P04", "P05"]
+    harness.set_counts(miss={"P00": 3, "P01": 5, "P02": 2, "P03": 4})
+    harness.set_last_round_players(["P04", "P05"])
 
     due = {p.name for p in build_session_state().participants if p.due}
 
@@ -94,10 +91,10 @@ def test_current_round_groups_players_by_selection_reason():
 
     current = build_session_state().current_round
 
-    assert current.round_id == state.round_id
+    assert current.round_id == harness.round_id()
     by_reason = {g.reason: g.players for g in current.selections}
     assert by_reason["manual_check"] == ["P05"]
-    assert sorted(sum(by_reason.values(), [])) == sorted(state.last_players)
+    assert sorted(sum(by_reason.values(), [])) == sorted(harness.last_round_players())
 
 
 def test_previous_round_players_are_from_the_round_before_the_latest():
@@ -119,11 +116,11 @@ def test_session_is_served_over_http():
 
 def test_auto_forced_is_computed_from_the_current_state():
     setup_session(10, auto_force=True)
-    state.participation_counts = {p: (0 if p == "P00" else 4) for p in state.participants}
+    harness.set_counts(participation={p: 4 for p in players(10) if p != "P00"})
 
     assert [p.name for p in build_session_state().participants if p.auto_forced] == ["P00"]
 
     # 保存した値ではなく今の状態から計算するので、設定を変えればすぐ反映される
-    state.excluded_players = ["P00"]
+    logic.set_excluded("P00", True)
     assert not any(p.auto_forced for p in build_session_state().participants)
 

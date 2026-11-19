@@ -3,15 +3,14 @@ import typing
 
 import pytest
 
-from roulette.logic import (
+from roulette.logic import draw_blocker, set_excluded, set_forced
+from roulette.models import (
     DrawBlock,
     ModeNotAvailable,
     NotEnoughParticipants,
     OrganizersRequired,
     TeamForcedOverSlots,
     TooManyForced,
-    draw_blocker,
-    state,
 )
 from roulette.messages import describe_draw_block
 from tests.simulation import setup_session
@@ -48,6 +47,8 @@ def test_draw_blocker_reports_the_reason_and_numbers_without_wording():
 
     assert draw_blocker("standard_3") == TeamForcedOverSlots(team="A", forced=2, slots=1)
 
-    state.forced_player_teams = {"P00": "none", "P01": "none"}
-    state.excluded_players = ["P02", "P03", "P04", "P05"]
+    set_forced("P00", "none")
+    set_forced("P01", "none")
+    for p in ("P02", "P03", "P04", "P05"):
+        set_excluded(p, True)
     assert draw_blocker("standard_4") == NotEnoughParticipants(needed=4, eligible=2)

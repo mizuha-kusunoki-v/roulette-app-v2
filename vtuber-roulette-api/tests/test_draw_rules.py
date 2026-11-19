@@ -7,8 +7,9 @@ import random
 
 import pytest
 
-from roulette.logic import state
-from tests.simulation import HOST_MODES, Scenario, draw, players, setup_session, slots
+from roulette import logic
+from tests import harness
+from tests.simulation import Scenario, draw, players, setup_session, slots
 
 MODES = ("standard_3", "standard_4", "hosts_vs_duo", "hosts_split_pairs")
 
@@ -56,8 +57,8 @@ def test_each_draw_fills_every_slot_with_distinct_non_organizers():
         for r in history:
             assert len(r.selected) == slots(s.mode), s
             assert len(set(r.selected)) == len(r.selected), s
-            assert set(r.selected) <= set(state.participants), s
-            assert not set(r.selected) & set(r.before["organizers"]), s
+            assert set(r.selected) <= set(r.before.participants), s
+            assert not set(r.selected) & set(r.before.active_organizers), s
 
 
 def test_excluded_players_are_never_selected():
@@ -69,8 +70,7 @@ def test_excluded_players_are_never_selected():
 def test_excluded_player_is_not_auto_forced_even_when_far_below_median():
     # 参加回数が中央値より大きく少なく (自動強制の条件)、かつ除外されている人
     setup_session(10, auto_force=True, excluded=["P00"])
-    state.participation_counts = {p: (0 if p == "P00" else 4) for p in state.participants}
-    state.miss_counts = {p: 0 for p in state.participants}
+    harness.set_counts(participation={p: 4 for p in players(10) if p != "P00"}, miss={})
 
     r = draw("standard_4")
 
@@ -95,12 +95,8 @@ def test_forced_team_is_respected(mode):
 def test_players_from_last_round_rest_when_enough_others_are_available():
     for s, history in scenario_rounds():
         for r in history:
-            last = set(r.before["last_players"])
-            organizers = set(r.before["organizers"]) if s.mode in HOST_MODES or s.mode == "standard_3" else set()
-            others = [
-                p for p in r.before["participants"]
-                if p not in last and p not in s.excluded and p not in organizers
-            ]
+            last = set(r.before.last_round_players)
+            others = [p for p in r.before.participants if p not in last and p not in s.excluded]
             if len(others) >= slots(s.mode):
                 repeated = (set(r.selected) & last) - set(s.forced)
                 assert not repeated, (s, r.reasons)
@@ -111,9 +107,9 @@ def test_players_who_missed_too_often_are_selected_when_they_fit():
         for r in history:
             b = r.before
             due = [
-                p for p in b["participants"]
-                if b["miss_counts"].get(p, 0) >= b["miss_threshold"]
-                and p not in b["last_players"]
+                p for p in b.participants
+                if b.miss_counts[p] >= b.miss_threshold
+                and p not in b.last_round_players
                 and p not in s.excluded
                 and p not in s.forced
             ]
@@ -124,14 +120,12 @@ def test_players_who_missed_too_often_are_selected_when_they_fit():
 
 def test_a_participant_with_the_same_name_as_an_organizer_is_an_ordinary_participant():
     # 主催と参加者の名前の一致は偶然の一致で、別人として扱う (運用では被らない前提だが、照合はしない)
-    setup_session(4, "standard_3")
-    state.organizers = ["P00"]
-    state.forced_players = ["P00"]
-    state.forced_player_teams = {"P00": "B"}
+    setup_session(4, "standard_3", forced=["P00"], forced_teams={"P00": "B"})
+    logic.configure_organizers("single", ["P00"], ["P00"])
 
     r = draw("standard_3")
 
     assert r.team_a[0] != "P00"  # 抽選枠のチームAに主催が入るわけではない
     assert "P00" in r.team_b  # 参加者の P00 は強制どおりチームBに入る
-    assert state.participation_counts["P00"] == 1
+    assert harness.participation_counts()["P00"] == 1
 

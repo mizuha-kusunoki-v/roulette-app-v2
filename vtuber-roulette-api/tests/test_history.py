@@ -6,30 +6,28 @@
 
 import random
 
-from roulette.logic import (
-    active_organizers,
-    build_result,
-    count_history,
-    delete_history_record,
-    replace_participants,
-    state,
-)
+from roulette.logic import build_result, delete_history_record, replace_participants
 from roulette.models import Selection
+from tests import harness
 from tests.simulation import draw, players, setup_session
 
 
 def counts_from_history() -> tuple[dict, dict, dict]:
-    tally = count_history(state.history)
-    current = state.participants
-    return (
-        {p: tally.participation_counts.get(p, 0) for p in current},
-        {p: tally.miss_counts.get(p, 0) for p in current},
-        tally.pair_counts,
-    )
+    return harness.recount()
 
 
 def counts_in_state() -> tuple[dict, dict, dict]:
-    return dict(state.participation_counts), dict(state.miss_counts), dict(state.pair_counts)
+    return harness.participation_counts(), harness.miss_counts(), harness.pair_counts()
+
+
+def latest_round() -> tuple:
+    return (
+        counts_in_state(),
+        harness.last_round_players(),
+        harness.previous_round_players(),
+        harness.round_id(),
+        harness.latest_record().teams if harness.history_round_ids() else None,
+    )
 
 
 def test_counts_after_each_draw_equal_a_recount_of_the_history():
@@ -41,7 +39,7 @@ def test_counts_after_each_draw_equal_a_recount_of_the_history():
         # 入れ直すと、抽選 (1 回分を足す) では参加回数が 0 から始まり、履歴を消して数え直すと昔の回も数える。
         # この食い違いは既知 (どちらを正とするか未決) なので、ここでは扱わない
         if rng.random() < 0.3:
-            names = [p for p in state.participants if rng.random() > 0.1] + [next(new_names)]
+            names = [p for p in harness.participants() if rng.random() > 0.1] + [next(new_names)]
             if len(names) >= 4:
                 replace_participants(names)
         draw("standard_4")
@@ -53,15 +51,14 @@ def test_deleting_the_latest_round_restores_what_was_before_it():
     setup_session(7)
     for _ in range(5):
         draw("standard_4")
-    state.phase = "result"
-    before = (counts_in_state(), list(state.last_players), list(state.prev_players), state.result, state.round_id)
+    harness.finish_presentation()
+    before = latest_round()
 
     latest = draw("standard_4")
-    assert delete_history_record(state.round_id)
+    assert delete_history_record(harness.round_id())
 
-    after = (counts_in_state(), list(state.last_players), list(state.prev_players), state.result, state.round_id)
-    assert after == before
-    assert state.phase == "result"
+    assert latest_round() == before
+    assert harness.phase() == "result"
     assert latest.selected != []
 
 
@@ -69,24 +66,24 @@ def test_deleting_a_middle_round_recounts_from_the_rest():
     setup_session(7)
     for _ in range(6):
         draw("standard_4")
-    middle = state.history[2].round_id
+    middle = harness.history_round_ids()[2]
 
     assert delete_history_record(middle)
 
-    assert middle not in [r.round_id for r in state.history]
+    assert middle not in harness.history_round_ids()
     assert counts_in_state() == counts_from_history()
-    assert state.last_players == state.history[-1].selected
+    assert harness.last_round_players() == harness.latest_record().selected
 
 
 def test_deleting_every_round_returns_to_idle():
     setup_session(5)
     draw("standard_4")
 
-    assert delete_history_record(state.round_id)
+    assert delete_history_record(harness.round_id())
 
-    assert state.phase == "idle"
-    assert state.result is None and state.last_players == []
-    assert set(state.participation_counts.values()) == {0}
+    assert harness.phase() == "idle"
+    assert harness.round_id() is None and harness.last_round_players() == []
+    assert set(harness.participation_counts().values()) == {0}
 
 
 def test_build_result_puts_organizers_from_the_argument():
@@ -106,8 +103,8 @@ def test_draw_records_the_organizers_and_participants_of_that_round():
 
     draw("hosts_vs_duo")
 
-    record = state.history[-1]
-    assert record.organizers == active_organizers() == ["Host1", "Host2"]
+    record = harness.latest_record()
+    assert record.organizers == harness.active_organizers() == ["Host1", "Host2"]
     assert record.participants == players(6)
     assert list(record.reasons) == record.selected
 
@@ -118,10 +115,10 @@ def test_removing_a_participant_drops_them_from_the_latest_rounds():
     latest = draw("standard_4")
     gone = [latest.selected[0], before_latest.selected[0]]
 
-    replace_participants([p for p in state.participants if p not in gone])
+    replace_participants([p for p in harness.participants() if p not in gone])
 
-    assert not set(gone) & set(state.last_players)
-    assert not set(gone) & set(state.prev_players)
-    assert set(state.participation_counts) == set(state.participants)
+    assert not set(gone) & set(harness.last_round_players())
+    assert not set(gone) & set(harness.previous_round_players())
+    assert set(harness.participation_counts()) == set(harness.participants())
     assert counts_in_state() == counts_from_history()
 

@@ -1,7 +1,8 @@
 """抽選ロジックの評価用シミュレーションと評価関数。
 
 抽選は API と同じ入口 (router.draw) から呼ぶので、重複ペア抑制の再抽選も含めて評価できる。
-状態はモジュールのグローバル (logic.state) なので、各テストの前に conftest がリセットする。
+状態は操作 (logic の操作関数) で作り、結果は tests/harness.py を通して名前で読む。
+状態はモジュールのグローバルなので、各テストの前に conftest がリセットする。
 """
 
 import math
@@ -11,9 +12,10 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Sequence
 
 from roulette import logic, router
-from roulette.logic import get_team_slots, state
+from roulette.logic import get_team_slots
 from roulette.models import DrawMode
 from roulette.protocol import DrawRequest
+from tests import harness
 
 HOST_MODES: tuple[DrawMode, ...] = ("hosts_vs_duo", "hosts_split_pairs")
 
@@ -32,20 +34,22 @@ def setup_session(
     forced: Sequence[str] = (),
     forced_teams: Dict[str, str] | None = None,
 ) -> None:
-    """n 人の参加者で抽選できる状態にする。主催はモードに合わせて自動で置く。"""
+    """n 人の参加者で抽選できる状態を、画面と同じ操作で作る。主催はモードに合わせて置く。
+
+    forced_teams は "none" (チーム指定なし) / "A" / "B"。
+    """
     logic.reset_state()
-    state.participants = players(n)
+    logic.replace_participants(players(n))
     if mode in HOST_MODES:
-        state.organizer_mode = "double"
-        state.organizers = ["Host1", "Host2"]
-        state.selected_organizer_indices = [0, 1]
+        logic.configure_organizers("double", ["Host1", "Host2"], ["Host1", "Host2"])
     elif mode == "standard_3":
-        state.organizers = ["Host1"]
-    state.enable_auto_force = auto_force
-    state.miss_threshold = miss_threshold
-    state.excluded_players = list(excluded)
-    state.forced_players = list(forced)
-    state.forced_player_teams = dict(forced_teams or {p: "none" for p in forced})
+        logic.configure_organizers("single", ["Host1"], ["Host1"])
+    logic.save_settings(miss_threshold, auto_force)
+    for p in excluded:
+        logic.set_excluded(p, True)
+    teams = forced_teams or {}
+    for p in forced:
+        logic.set_forced(p, teams.get(p, "none"))
 
 
 def slots(mode: DrawMode) -> int:
@@ -57,7 +61,7 @@ def slots(mode: DrawMode) -> int:
 class Round:
     """1 回の抽選の前後の情報。評価関数はこれの列を受け取る。"""
 
-    before: Dict  # 抽選前の state (model_dump)
+    before: harness.Before
     selected: List[str]  # [チームA..., チームB...] の順
     team_a: List[str]
     team_b: List[str]
@@ -65,16 +69,16 @@ class Round:
 
 
 def draw(mode: DrawMode) -> Round:
-    before = state.model_dump()
+    before = harness.before()
     router.draw(DrawRequest(mode=mode))
     a_slots, _ = get_team_slots(mode)
-    selected = list(state.last_players)
+    record = harness.latest_record()
     return Round(
         before=before,
-        selected=selected,
-        team_a=selected[:a_slots],
-        team_b=selected[a_slots:],
-        reasons=dict(state.last_selection_reasons),
+        selected=record.selected,
+        team_a=record.selected[:a_slots],
+        team_b=record.selected[a_slots:],
+        reasons=record.reasons,
     )
 
 
@@ -111,7 +115,7 @@ def worst_median_gap(history: Iterable[Round], candidates: Sequence[str]) -> flo
 
 def matchup_repeat_sd() -> float:
     """同じ対戦カードが出た回数のばらつき (標準偏差)。小さいほど偏りが少ない。"""
-    return statistics.pstdev(Counter(state.pair_counts).values())
+    return statistics.pstdev(Counter(harness.pair_counts()).values())
 
 
 def fair_wait_bound(n_candidates: int, mode: DrawMode, miss_threshold: int) -> int:
