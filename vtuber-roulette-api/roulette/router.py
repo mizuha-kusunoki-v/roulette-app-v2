@@ -182,24 +182,26 @@ def reset(request: Request):
 def build_state(conn: HTTPConnection) -> SessionState:
     """今の状態にその新しさの印 (Revision) を付けて返す。GET /session と /ws/session が同じ組み立てを使う。
 
-    印は状態を読む前に取る。読んでいる間に書き込みがあっても、状態は印より新しいことはあっても古くはならない。
-    書き込みの後の通知で version が進み、そのとき改めて送るので、画面は最後には最新の状態を採用する。
+    呼ぶ側が状態の鍵 (main.create_app の state_lock) を持っている間に呼ぶ。GET /session はミドルウェアが、
+    /ws/session は _push が鍵を取る。鍵の中では書き込みが起きないので、印と状態はいつも同じ時点のものになる。
     """
     changes: StateChanges = conn.app.state.changes
     revision = Revision(instance_id=changes.instance_id, version=changes.version)
     return build_session_state(current_session(conn), revision)
 
 
-async def _push(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
-    """接続直後に build() の結果を送り、その後は書き込みの通知のたびに送る。
+async def _push(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges, lock: asyncio.Lock) -> None:
+    """接続直後に build() の結果を送り、その後は書き込みの通知のたびに送る (内容が前回と同じでも送る)。
 
-    内容が前回と同じでも送る。書き込みの途中に読んだ状態は、新しい内容に古い version が付くことがある。
-    そのあと version が進んだ状態を送り直さないと、同じ version の古い状態を先に採用した画面が、新しい内容に追いつけない。
+    組み立てる間は、HTTP のリクエストと同じ鍵 (main.create_app の state_lock) を持つ。書き込みの途中を読まず、
+    組み立てた状態と version はいつも同じ時点のものになる。送るのは鍵を放してから (遅い接続が書き込みを止めないように)。
     """
     while True:
-        # 状態を読む前に version を取っておく。読んだ後の変更は wait_after がすぐ返すので取りこぼさない
-        version = changes.version
-        await ws.send_json(build().model_dump(mode="json"))
+        async with lock:
+            version = changes.version
+            payload = build().model_dump(mode="json")
+        await ws.send_json(payload)
+        # 組み立てた後の書き込みは version を進めるので、wait_after がすぐ返して取りこぼさない
         await changes.wait_after(version)
 
 
@@ -209,9 +211,9 @@ async def _wait_disconnect(ws: WebSocket) -> None:
         await ws.receive_text()  # 切断されると WebSocketDisconnect が上がる
 
 
-async def _serve(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
+async def _serve(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges, lock: asyncio.Lock) -> None:
     await ws.accept()
-    push = asyncio.create_task(_push(ws, build, changes))
+    push = asyncio.create_task(_push(ws, build, changes, lock))
     listen = asyncio.create_task(_wait_disconnect(ws))
     done, pending = await asyncio.wait({push, listen}, return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
@@ -234,4 +236,4 @@ def get_session(request: Request) -> SessionState:
 @router.websocket("/ws/session")
 async def session_websocket(ws: WebSocket):
     # リセットでセッションが差し替わるので、送るたびにアプリから取り出す
-    await _serve(ws, lambda: build_state(ws), ws.app.state.changes)
+    await _serve(ws, lambda: build_state(ws), ws.app.state.changes, ws.app.state.state_lock)

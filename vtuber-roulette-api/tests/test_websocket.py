@@ -10,7 +10,7 @@ from tests import harness
 WAIT_SECONDS = 2.0
 
 
-def receive_json(ws) -> dict:
+def receive_json(ws, seconds: float = WAIT_SECONDS) -> dict:
     """待ち時間に上限を付けて 1 件受け取る。
 
     TestClient の receive_json には上限がなく、届かない不具合のときにテストが失敗せず止まる。
@@ -18,7 +18,7 @@ def receive_json(ws) -> dict:
     """
 
     async def receive():
-        with anyio.fail_after(WAIT_SECONDS):
+        with anyio.fail_after(seconds):
             return await ws._send_rx.receive()
 
     return json.loads(ws.portal.call(receive)["text"])
