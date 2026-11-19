@@ -16,13 +16,17 @@ from .logic import (
     state,
 )
 from .messages import PRESENTATION_RUNNING, describe_draw_block
+from . import models
 from .models import DrawMode
 from .protocol import (
     CurrentRound,
+    DrawRecord,
     DrawOption,
     ForcedTeam,
     Organizer,
     ParticipantStatus,
+    ResultTeam,
+    RouletteResult,
     SelectionGroup,
     SessionState,
     Settings,
@@ -46,6 +50,25 @@ def _draw_option(mode: DrawMode) -> DrawOption:
     return DrawOption(mode=mode, available=reason is None, unavailable_reason=reason)
 
 
+def _result(result: models.RouletteResult) -> RouletteResult:
+    return RouletteResult(
+        kind=result.kind,
+        teams=[ResultTeam(label=t.label, players=list(t.players)) for t in result.teams],
+    )
+
+
+def _record(record: models.DrawRecord) -> DrawRecord:
+    return DrawRecord(
+        round_id=record.round_id,
+        drawn_at=record.drawn_at,
+        result=_result(record.result),
+        selected=list(record.selected),
+        organizers=list(record.organizers),
+        participants=list(record.participants),
+        reasons=dict(record.reasons),
+    )
+
+
 def _current_round() -> CurrentRound | None:
     if state.round_id is None or state.result is None:
         return None
@@ -53,7 +76,7 @@ def _current_round() -> CurrentRound | None:
     for name, reason in state.last_selection_reasons.items():
         grouped.setdefault(reason, []).append(name)
     selections = [SelectionGroup(reason=r, players=names) for r, names in grouped.items()]  # type: ignore[arg-type]
-    return CurrentRound(round_id=state.round_id, result=state.result, selections=selections)
+    return CurrentRound(round_id=state.round_id, result=_result(state.result), selections=selections)
 
 
 def build_session_state() -> SessionState:
@@ -83,5 +106,5 @@ def build_session_state() -> SessionState:
         draw_options=[_draw_option(m) for m in modes_for_organizer_mode()],
         current_round=_current_round(),
         previous_round_players=list(state.prev_players),
-        history=list(state.history),
+        history=[_record(r) for r in state.history],
     )

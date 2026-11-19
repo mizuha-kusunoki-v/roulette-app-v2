@@ -138,7 +138,8 @@ def draw(req: DrawRequest):
         )
     )
 
-    return {"round_id": state.round_id, "result": result}
+    # 結果は /session と /ws/session で届くので、ここでは回の ID だけを返す (内部のモデルを外に出さない)
+    return {"round_id": state.round_id}
 
 
 @router.post("/presentation_complete")

@@ -1,19 +1,42 @@
 """フロントとバックエンドの間のプロトコル (サーバーから送る状態と、画面から送る操作のメッセージの形)。
 
-ここにはメッセージの形だけを置き、内部の状態や抽選のルールには依存しない。
+ここにはメッセージの形だけを置き、内部の状態 (models)・抽選のルール (logic) には依存しない。
+内部と同じ名前の型 (RouletteResult など) も、ここで別に定義する。
 内部の状態からこの形を組み立てるのは snapshot.py、ルールから導く値の計算は logic.py が受け持つ。
 内部の持ち方を変えても、この形を保てばフロントは壊れない。
 """
 
-from typing import List, Literal
+from typing import Dict, List, Literal
 
 from pydantic import BaseModel
 
-from .models import DrawMode, DrawRecord, OrganizerMode, RouletteResult
-
+DrawMode = Literal["standard_3", "standard_4", "hosts_vs_duo", "hosts_split_pairs"]
+OrganizerMode = Literal["single", "double"]
 Phase = Literal["idle", "spinning", "result"]
 SelectionReason = Literal["manual_check", "miss_3", "median_gap", "random", "exception_prev_round"]
 ForcedTeam = Literal["any", "A", "B"]
+
+
+class ResultTeam(BaseModel):
+    label: str
+    players: List[str]
+
+
+class RouletteResult(BaseModel):
+    kind: DrawMode
+    teams: List[ResultTeam]
+
+
+# 抽選履歴の 1 回分。画面で JSON に書き出すときもこの形になる
+# (クラスの docstring は OpenAPI の説明に入って契約が変わるので、コメントで書く)
+class DrawRecord(BaseModel):
+    round_id: str
+    drawn_at: str  # ISO8601
+    result: RouletteResult
+    selected: List[str]  # 抽選で選ばれた参加者 (主催を除く)
+    organizers: List[str]  # 抽選時点の有効な主催
+    participants: List[str]  # 抽選時点の参加者
+    reasons: Dict[str, str] = {}
 
 
 class Organizer(BaseModel):
