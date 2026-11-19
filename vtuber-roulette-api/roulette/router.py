@@ -1,26 +1,25 @@
 import asyncio
 import random
+from typing import Callable
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from .changes import state_changes
 from .logic import (
-    active_organizers,
     apply_draw_result,
     build_result,
     compute_auto_forced_players,
     compute_matchup_key,
     delete_history_record,
-    get_team_slots,
+    draw_blocker,
+    forced_players_limit,
     organizer_set,
     reset_state,
     sanitize_names,
     select_players,
     state,
-    validate_draw_mode,
 )
-
-_PAIR_RETRY_MAX = 10
 from .models import (
     DrawRequest,
     DrawSettingsRequest,
@@ -30,6 +29,9 @@ from .models import (
     ParticipantsRequest,
     PresentationCompleteRequest,
 )
+from .protocol import SessionState, session_state
+
+_PAIR_RETRY_MAX = 10
 
 router = APIRouter()
 
@@ -37,10 +39,6 @@ router = APIRouter()
 @router.get("/state")
 def get_state():
     return state
-
-
-def forced_players_limit() -> int:
-    return 2 if state.organizer_mode == "double" else 4
 
 
 def _clean_forced_player_teams() -> None:
@@ -130,38 +128,9 @@ def set_excluded_players(req: ExcludedPlayersRequest):
 
 @router.post("/draw")
 def draw(req: DrawRequest):
-    validate_draw_mode(req.mode)
-
-    team_a_slots, team_b_slots = get_team_slots(req.mode)
-    total_slots = team_a_slots + team_b_slots
-
-    organizers = organizer_set()
-    effective_forced = [
-        p for p in state.forced_players if p in state.participants and p not in organizers
-    ]
-
-    team_a_forced_count = sum(
-        1 for p in effective_forced if state.forced_player_teams.get(p) == "A"
-    )
-    team_b_forced_count = sum(
-        1 for p in effective_forced if state.forced_player_teams.get(p) == "B"
-    )
-
-    if team_a_forced_count > team_a_slots:
-        raise HTTPException(
-            status_code=400,
-            detail=f"チームAの強制人数（{team_a_forced_count}人）が抽選枠（{team_a_slots}人）を超えています",
-        )
-    if team_b_forced_count > team_b_slots:
-        raise HTTPException(
-            status_code=400,
-            detail=f"チームBの強制人数（{team_b_forced_count}人）が抽選枠（{team_b_slots}人）を超えています",
-        )
-    if len(effective_forced) > total_slots:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{total_slots}人抽選では手動強制は{total_slots}人以内にしてください（現在{len(effective_forced)}人選択中）",
-        )
+    blocker = draw_blocker(req.mode)
+    if blocker:
+        raise HTTPException(status_code=400, detail=blocker)
 
     for attempt in range(_PAIR_RETRY_MAX + 1):
         selected, spin_order, selection_reasons = select_players(req.mode)
@@ -210,13 +179,13 @@ def reset():
     return {"ok": True}
 
 
-async def _push_state(ws: WebSocket) -> None:
-    """接続直後に状態を送り、その後は状態が変わったときだけ送る。"""
+async def _push(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
+    """接続直後に build() の結果を送り、その後は内容が変わったときだけ送る。"""
     last_sent = None
     while True:
         # 状態を読む前に version を取っておく。読んだ後の変更は wait_after がすぐ返すので取りこぼさない
         version = state_changes.version
-        payload = state.model_dump(mode="json")
+        payload = build().model_dump(mode="json")
         if payload != last_sent:
             await ws.send_json(payload)
             last_sent = payload
@@ -229,10 +198,9 @@ async def _wait_disconnect(ws: WebSocket) -> None:
         await ws.receive_text()  # 切断されると WebSocketDisconnect が上がる
 
 
-@router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def _serve(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
     await ws.accept()
-    push = asyncio.create_task(_push_state(ws))
+    push = asyncio.create_task(_push(ws, build))
     listen = asyncio.create_task(_wait_disconnect(ws))
     done, pending = await asyncio.wait({push, listen}, return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
@@ -242,3 +210,22 @@ async def websocket_endpoint(ws: WebSocket):
         error = task.exception()
         if error is not None and not isinstance(error, WebSocketDisconnect):
             raise error
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    # 旧形式 (内部状態をそのまま送る)。フロントをビューに切り替えたら消す
+    await _serve(ws, lambda: state)
+
+
+# ── プロトコル (サーバーから送る状態) ─────────────────────────────────────────
+
+
+@router.get("/session")
+def get_session() -> SessionState:
+    return session_state()
+
+
+@router.websocket("/ws/session")
+async def session_websocket(ws: WebSocket):
+    await _serve(ws, session_state)

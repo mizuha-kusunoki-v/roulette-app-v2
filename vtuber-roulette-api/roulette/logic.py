@@ -101,21 +101,54 @@ def compute_auto_forced_players(
     return auto_forced
 
 
-def validate_draw_mode(mode: DrawMode) -> None:
-    if state.organizer_mode == "single" and mode not in ("standard_3", "standard_4"):
-        raise HTTPException(
-            status_code=400,
-            detail="single organizer mode supports only standard draws",
-        )
+SINGLE_MODES: tuple[DrawMode, ...] = ("standard_3", "standard_4")
+DOUBLE_MODES: tuple[DrawMode, ...] = ("hosts_vs_duo", "hosts_split_pairs")
 
-    if state.organizer_mode == "double" and mode not in ("hosts_vs_duo", "hosts_split_pairs"):
-        raise HTTPException(
-            status_code=400,
-            detail="double organizer mode supports only 2-player draws",
-        )
 
+def modes_for_organizer_mode() -> tuple[DrawMode, ...]:
+    return DOUBLE_MODES if state.organizer_mode == "double" else SINGLE_MODES
+
+
+def forced_players_limit() -> int:
+    return 2 if state.organizer_mode == "double" else 4
+
+
+def manual_forced_players() -> List[str]:
+    """手動強制のうち、今の参加者で主催ではない人。"""
+    organizers = organizer_set()
+    return [p for p in state.forced_players if p in state.participants and p not in organizers]
+
+
+def draw_blocker(mode: DrawMode) -> str | None:
+    """この mode で今は抽選できない理由を返す。抽選できるなら None。
+
+    抽選 API と画面のボタンの可否の両方がこれを使う。抽選演出中かどうかは見ない。
+    """
+    if mode not in modes_for_organizer_mode():
+        return "今の主催モードでは実行できない抽選です"
     if state.organizer_mode == "double" and len(active_organizers()) < 2:
-        raise HTTPException(status_code=400, detail="two organizers are required")
+        return "主催2人モードでは主催を2人選択してください"
+
+    team_a_slots, team_b_slots = get_team_slots(mode)
+    total_slots = team_a_slots + team_b_slots
+    forced = manual_forced_players()
+    team_a_forced = sum(1 for p in forced if state.forced_player_teams.get(p) == "A")
+    team_b_forced = sum(1 for p in forced if state.forced_player_teams.get(p) == "B")
+    if team_a_forced > team_a_slots:
+        return f"チームAの強制人数（{team_a_forced}人）が抽選枠（{team_a_slots}人）を超えています"
+    if team_b_forced > team_b_slots:
+        return f"チームBの強制人数（{team_b_forced}人）が抽選枠（{team_b_slots}人）を超えています"
+    if len(forced) > total_slots:
+        return f"{total_slots}人抽選では手動強制は{total_slots}人以内にしてください（現在{len(forced)}人選択中）"
+
+    organizers = organizer_set()
+    eligible = {
+        p for p in state.participants
+        if p not in organizers and p not in state.excluded_players
+    } | set(forced)
+    if len(eligible) < total_slots:
+        return f"{total_slots}人抽選には、主催と除外を除いて{total_slots}人以上の参加者が必要です"
+    return None
 
 
 def select_players(mode: DrawMode):
@@ -130,10 +163,7 @@ def select_players(mode: DrawMode):
     organizers = organizer_set()
 
     # 有効な手動強制プレイヤー一覧
-    all_manual_forced = [
-        p for p in state.forced_players
-        if p in state.participants and p not in organizers
-    ]
+    all_manual_forced = manual_forced_players()
 
     # チーム指定別に分離
     team_a_forced = [
