@@ -1,7 +1,7 @@
 @echo off
 set "ROOT=%~dp0"
 
-start "Roulette API 8000" /D "%ROOT%vtuber-roulette-api" cmd /k ".venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000 --reload"
+start "Roulette API 8000" /D "%ROOT%vtuber-roulette-api" cmd /k "uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
 start "Roulette Frontend 3000" /D "%ROOT%vtuber-roulette" cmd /k "npm start"
 
 echo Started.
