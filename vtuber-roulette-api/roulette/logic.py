@@ -1,6 +1,6 @@
 import random
 import statistics
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 from draw_config import (
     AUTO_FORCE_MAX_PER_DRAW,
@@ -160,39 +160,47 @@ def save_settings(miss_threshold: int, enable_auto_force: bool) -> None:
 
 
 def compute_auto_forced_players(
-    manual_forced: List[str],
-    already_selected: List[str] | None = None,
+    participation_counts: Dict[str, int],
+    candidates: List[str],
+    *,
+    median_gap: int,
+    max_per_draw: int,
 ) -> List[str]:
-    """次の抽選で自動強制 (参加回数の中央値差) の対象になる人。
+    """自動強制 (参加回数の中央値差) のルール。state を読まない。
+
+    participation_counts は参加者全員の参加回数 (中央値はこの全員で取る)。
+    candidates のうち、参加回数が「中央値 - median_gap」以下の人を、参加回数の少ない順
+    (同じ回数は名前順) に最大 max_per_draw 人 (0 なら無制限) 返す。
+    """
+    if not participation_counts:
+        return []
+    threshold = statistics.median(participation_counts.values()) - median_gap
+    picked = sorted(
+        (p for p in candidates if participation_counts.get(p, 0) <= threshold),
+        key=lambda p: (participation_counts.get(p, 0), p),
+    )
+    return picked[:max_per_draw] if max_per_draw > 0 else picked
+
+
+def auto_forced_players(already_selected: Sequence[str] = ()) -> List[str]:
+    """今の状態で、次の抽選の自動強制の対象になる人。
 
     状態から導く値なので保存せず、必要なとき (抽選、画面に送る状態の組み立て) に毎回計算する。
+    手動強制・前回出た人・除外中・ミス回数の保証の対象・already_selected は候補から外す。
     """
-    if not state.enable_auto_force or not state.participants:
+    if not state.enable_auto_force:
         return []
-
-    skip = set(already_selected or []) | set(state.excluded_players)
-    participant_counts = [
-        state.participation_counts.get(p, 0) for p in state.participants
+    skip = set(manual_forced_players()) | set(state.last_players) | set(state.excluded_players) | set(already_selected)
+    candidates = [
+        p for p in state.participants
+        if p not in skip and state.miss_counts.get(p, 0) < state.miss_threshold
     ]
-    if not participant_counts:
-        return []
-
-    median_count = statistics.median(participant_counts)
-    threshold = median_count - AUTO_FORCE_MEDIAN_GAP
-
-    auto_forced = [
-        p
-        for p in state.participants
-        if p not in manual_forced
-        and p not in state.last_players
-        and p not in skip
-        and state.miss_counts.get(p, 0) < state.miss_threshold
-        and state.participation_counts.get(p, 0) <= threshold
-    ]
-    auto_forced.sort(key=lambda p: (state.participation_counts.get(p, 0), p))
-    if AUTO_FORCE_MAX_PER_DRAW > 0:
-        auto_forced = auto_forced[:AUTO_FORCE_MAX_PER_DRAW]
-    return auto_forced
+    return compute_auto_forced_players(
+        {p: state.participation_counts.get(p, 0) for p in state.participants},
+        candidates,
+        median_gap=AUTO_FORCE_MEDIAN_GAP,
+        max_per_draw=AUTO_FORCE_MAX_PER_DRAW,
+    )
 
 
 SINGLE_MODES: tuple[DrawMode, ...] = ("standard_3", "standard_4")
@@ -346,7 +354,7 @@ def select_players(mode: DrawMode) -> Selection:
         if p not in state.last_players and p not in state.excluded_players and not slots.has(p)
     ]
     slots.fill(_longest_wait_first([p for p in fresh if is_due(p)]), "miss_3")
-    slots.fill(compute_auto_forced_players(forced, slots.chosen()), "median_gap")
+    slots.fill(auto_forced_players(slots.chosen()), "median_gap")
     slots.fill(_shuffled([p for p in fresh if not slots.has(p)]), "random")
     slots.fill(_shuffled([p for p in state.last_players if p not in state.excluded_players]), "exception_prev_round")
 

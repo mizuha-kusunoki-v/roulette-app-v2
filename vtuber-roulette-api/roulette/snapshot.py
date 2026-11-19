@@ -8,7 +8,7 @@ from typing import Dict, List
 
 from .logic import (
     active_organizers,
-    compute_auto_forced_players,
+    auto_forced_players,
     draw_blocker,
     forced_players_limit,
     is_due,
@@ -79,30 +79,42 @@ def _current_round() -> CurrentRound | None:
     return CurrentRound(round_id=state.round_id, result=_result(state.result), selections=selections)
 
 
-def build_session_state() -> SessionState:
+def _organizers() -> List[Organizer]:
     active = set(active_organizers())
-    auto_forced = set(compute_auto_forced_players(state.forced_players))
+    return [Organizer(name=n, active=n in active) for n in state.organizers]
+
+
+def _participants() -> List[ParticipantStatus]:
+    auto_forced = set(auto_forced_players())
+    return [
+        ParticipantStatus(
+            name=p,
+            participation_count=state.participation_counts.get(p, 0),
+            miss_count=state.miss_counts.get(p, 0),
+            forced=_forced_team(p),
+            excluded=p in state.excluded_players,
+            auto_forced=p in auto_forced,
+            due=is_due(p),
+        )
+        for p in state.participants
+    ]
+
+
+def _settings() -> Settings:
+    return Settings(
+        miss_threshold=state.miss_threshold,
+        enable_auto_force=state.enable_auto_force,
+        forced_limit=forced_players_limit(),
+    )
+
+
+def build_session_state() -> SessionState:
     return SessionState(
         phase=state.phase,
         organizer_mode=state.organizer_mode,
-        organizers=[Organizer(name=n, active=n in active) for n in state.organizers],
-        participants=[
-            ParticipantStatus(
-                name=p,
-                participation_count=state.participation_counts.get(p, 0),
-                miss_count=state.miss_counts.get(p, 0),
-                forced=_forced_team(p),
-                excluded=p in state.excluded_players,
-                auto_forced=p in auto_forced,
-                due=is_due(p),
-            )
-            for p in state.participants
-        ],
-        settings=Settings(
-            miss_threshold=state.miss_threshold,
-            enable_auto_force=state.enable_auto_force,
-            forced_limit=forced_players_limit(),
-        ),
+        organizers=_organizers(),
+        participants=_participants(),
+        settings=_settings(),
         draw_options=[_draw_option(m) for m in modes_for_organizer_mode()],
         current_round=_current_round(),
         previous_round_players=list(state.prev_players),
