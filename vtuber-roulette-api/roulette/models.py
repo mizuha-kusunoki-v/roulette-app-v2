@@ -36,13 +36,11 @@ class RouletteState(BaseModel):
     forced_player_teams: Dict[str, str] = {}
     miss_threshold: int = 3
     enable_auto_force: bool = False
-    auto_forced_players: List[str] = []
     excluded_players: List[str] = []
     participation_counts: Dict[str, int] = {}
     pair_counts: Dict[str, int] = {}
     prev_players: List[str] = []
     last_players: List[str] = []
-    spin_order: List[str] = []
     miss_counts: Dict[str, int] = {}
     last_selection_reasons: Dict[str, str] = {}
     result: RouletteResult | None = None
@@ -50,6 +48,32 @@ class RouletteState(BaseModel):
     phase: Literal["idle", "spinning", "result"] = "idle"
     history: List[DrawRecord] = []
 
+
+
+# ── 抽選の途中で使う値 ────────────────────────────────────────────────────────
+
+
+@dataclass
+class Selection:
+    """1 回の抽選で選ばれた人。チームごとの並びと、選ばれた理由。"""
+
+    team_a: List[str]
+    team_b: List[str]
+    reasons: Dict[str, str]
+
+    @property
+    def players(self) -> List[str]:
+        """[チームA..., チームB...] の順。"""
+        return self.team_a + self.team_b
+
+
+@dataclass(frozen=True)
+class Tally:
+    """抽選の履歴から数える集計値。"""
+
+    participation_counts: Dict[str, int]
+    miss_counts: Dict[str, int]
+    pair_counts: Dict[str, int]  # 対戦カード (compute_matchup_key) ごとの回数
 
 # ── 抽選できない理由 (logic.draw_blocker が返す) ──────────────────────────────
 # 文言は持たない。利用者向けの文言は messages.py が組み立てる。

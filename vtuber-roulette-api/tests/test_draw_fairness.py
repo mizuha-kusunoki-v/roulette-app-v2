@@ -23,6 +23,8 @@ from tests.simulation import (
 )
 
 SEEDS = range(5)
+# 重複ペア抑制の効き目は種ごとのばらつきが大きく、5 通りの平均では 0.6〜0.9 倍に振れる。20 通りなら安定する
+PAIR_SEEDS = range(20)
 ROUNDS = 200
 
 
@@ -78,7 +80,7 @@ def test_pair_suppression_spreads_matchups_more_evenly(n):
     def average_sd(retry_max: int) -> float:
         router._PAIR_RETRY_MAX = retry_max
         values = []
-        for seed in SEEDS:
+        for seed in PAIR_SEEDS:
             random.seed(seed)
             setup_session(n)
             run("standard_4", ROUNDS)

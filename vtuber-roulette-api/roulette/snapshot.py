@@ -8,6 +8,7 @@ from typing import Dict, List
 
 from .logic import (
     active_organizers,
+    compute_auto_forced_players,
     draw_blocker,
     forced_players_limit,
     is_due,
@@ -57,6 +58,7 @@ def _current_round() -> CurrentRound | None:
 
 def build_session_state() -> SessionState:
     active = set(active_organizers())
+    auto_forced = set(compute_auto_forced_players(state.forced_players))
     return SessionState(
         phase=state.phase,
         organizer_mode=state.organizer_mode,
@@ -68,7 +70,7 @@ def build_session_state() -> SessionState:
                 miss_count=state.miss_counts.get(p, 0),
                 forced=_forced_team(p),
                 excluded=p in state.excluded_players,
-                auto_forced=p in state.auto_forced_players,
+                auto_forced=p in auto_forced,
                 due=is_due(p),
             )
             for p in state.participants

@@ -1,5 +1,7 @@
 import asyncio
 import random
+import uuid
+from datetime import datetime, timezone
 from typing import Callable
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -8,6 +10,7 @@ from pydantic import BaseModel
 from .changes import state_changes
 from .logic import (
     ForcedLimitError,
+    active_organizers,
     add_participant,
     apply_draw_result,
     build_result,
@@ -15,6 +18,7 @@ from .logic import (
     configure_organizers,
     delete_history_record,
     draw_blocker,
+    new_record,
     remove_participant,
     replace_participants,
     reset_state,
@@ -115,15 +119,24 @@ def draw(req: DrawRequest):
     if block is not None:
         raise HTTPException(status_code=400, detail=describe_draw_block(block))
 
+    organizers = active_organizers()
     for attempt in range(_PAIR_RETRY_MAX + 1):
-        selected, spin_order, selection_reasons = select_players(req.mode)
-        result = build_result(req.mode, selected)
-        key = compute_matchup_key(result)
-        count = state.pair_counts.get(key, 0)
+        selection = select_players(req.mode)
+        result = build_result(req.mode, selection, organizers)
+        count = state.pair_counts.get(compute_matchup_key(result), 0)
         # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
         if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
             break
-    apply_draw_result(selected, spin_order, selection_reasons, result)
+    apply_draw_result(
+        new_record(
+            round_id=str(uuid.uuid4()),
+            drawn_at=datetime.now(timezone.utc).isoformat(),
+            result=result,
+            selection=selection,
+            organizers=organizers,
+            participants=state.participants,
+        )
+    )
 
     return {"round_id": state.round_id, "result": result}
 

@@ -115,3 +115,15 @@ def test_session_is_served_over_http():
 
     assert [p["name"] for p in session["participants"]] == players(5)
     assert session["phase"] == "idle" and session["current_round"] is None
+
+
+def test_auto_forced_is_computed_from_the_current_state():
+    setup_session(10, auto_force=True)
+    state.participation_counts = {p: (0 if p == "P00" else 4) for p in state.participants}
+
+    assert [p.name for p in build_session_state().participants if p.auto_forced] == ["P00"]
+
+    # 保存した値ではなく今の状態から計算するので、設定を変えればすぐ反映される
+    state.excluded_players = ["P00"]
+    assert not any(p.auto_forced for p in build_session_state().participants)
+
