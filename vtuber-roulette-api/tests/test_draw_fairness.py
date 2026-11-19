@@ -12,11 +12,11 @@ import pytest
 from draw_config import AUTO_FORCE_MEDIAN_GAP
 from roulette import router
 from tests import harness
+from tests.builders import players
 from tests.simulation import (
     fair_wait_bound,
     matchup_repeat_sd,
     max_miss_streak,
-    players,
     run,
     setup_session,
     worst_median_gap,

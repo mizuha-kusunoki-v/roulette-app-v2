@@ -2,7 +2,7 @@
 
 from roulette.logic import auto_forced_players, compute_auto_forced_players
 from tests import harness
-from tests.simulation import setup_session
+from tests.builders import SessionBuilder
 
 
 def pick(counts, candidates=None, gap=2, limit=0):
@@ -36,9 +36,16 @@ def test_nobody_is_picked_without_participants():
 
 
 def test_state_wrapper_skips_forced_resting_excluded_and_due_players():
-    setup_session(10, auto_force=True, miss_threshold=3, excluded=["P02"], forced=["P03"])
-    harness.set_counts(participation={p: 9 for p in ("P05", "P06", "P07", "P08", "P09")}, miss={"P01": 5})
-    harness.set_last_round_players(["P00"])
+    harness.use(
+        SessionBuilder()
+        .participants(10)
+        .settings(miss_threshold=3, auto_force=True)
+        .excluded("P02")
+        .forced("P03")
+        .counts(participation={p: 9 for p in ("P05", "P06", "P07", "P08", "P09")}, miss={"P01": 5})
+        .last_round(["P00"])
+        .build()
+    )
 
     # P00 は前回出た、P01 はミス回数の保証の対象、P02 は除外中、P03 は手動強制
     assert auto_forced_players(harness.session()) == ["P04"]

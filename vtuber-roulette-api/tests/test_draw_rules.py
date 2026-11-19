@@ -9,7 +9,8 @@ import pytest
 
 from roulette import logic
 from tests import harness
-from tests.simulation import Scenario, draw, players, setup_session, slots
+from tests.builders import SessionBuilder, players
+from tests.simulation import Scenario, draw, setup_session, slots
 
 MODES = ("standard_3", "standard_4", "hosts_vs_duo", "hosts_split_pairs")
 
@@ -69,8 +70,14 @@ def test_excluded_players_are_never_selected():
 
 def test_excluded_player_is_not_auto_forced_even_when_far_below_median():
     # 参加回数が中央値より大きく少なく (自動強制の条件)、かつ除外されている人
-    setup_session(10, auto_force=True, excluded=["P00"])
-    harness.set_counts(participation={p: 4 for p in players(10) if p != "P00"}, miss={})
+    harness.use(
+        SessionBuilder()
+        .participants(10)
+        .settings(auto_force=True)
+        .excluded("P00")
+        .counts(participation={p: 4 for p in players(10) if p != "P00"})
+        .build()
+    )
 
     r = draw("standard_4")
 

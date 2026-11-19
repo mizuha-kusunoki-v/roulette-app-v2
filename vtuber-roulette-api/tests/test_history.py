@@ -9,7 +9,8 @@ import random
 from roulette.logic import build_result, delete_history_record, replace_participants
 from roulette.models import Selection
 from tests import harness
-from tests.simulation import draw, players, setup_session
+from tests.builders import players
+from tests.simulation import draw, setup_session
 
 
 def counts_from_history() -> tuple[dict, dict, dict]:

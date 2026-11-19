@@ -11,17 +11,13 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Sequence
 
-from roulette import logic, router
+from roulette import router
 from roulette.logic import get_team_slots
 from roulette.models import DrawMode
 from roulette.protocol import DrawRequest
 from tests import harness
 
-HOST_MODES: tuple[DrawMode, ...] = ("hosts_vs_duo", "hosts_split_pairs")
-
-
-def players(n: int) -> List[str]:
-    return [f"P{i:02d}" for i in range(n)]
+from tests.builders import SessionBuilder
 
 
 def setup_session(
@@ -34,22 +30,21 @@ def setup_session(
     forced: Sequence[str] = (),
     forced_teams: Dict[str, str] | None = None,
 ) -> None:
-    """n 人の参加者で抽選できる状態を、画面と同じ操作で作る。主催はモードに合わせて置く。
+    """n 人の参加者で抽選できる状態を作り、このテストのアプリに置く。主催はモードに合わせて置く。
 
-    forced_teams は "none" (チーム指定なし) / "A" / "B"。
+    forced_teams は "none" (チーム指定なし) / "A" / "B"。細かい状態が要るときは SessionBuilder を直接使う。
     """
-    session = harness.new_session()
-    logic.replace_participants(session, players(n))
-    if mode in HOST_MODES:
-        logic.configure_organizers(session, "double", ["Host1", "Host2"], ["Host1", "Host2"])
-    elif mode == "standard_3":
-        logic.configure_organizers(session, "single", ["Host1"], ["Host1"])
-    logic.save_settings(session, miss_threshold, auto_force)
-    for p in excluded:
-        logic.set_excluded(session, p, True)
+    builder = (
+        SessionBuilder()
+        .participants(n)
+        .organizers_for(mode)
+        .settings(miss_threshold=miss_threshold, auto_force=auto_force)
+        .excluded(*excluded)
+    )
     teams = forced_teams or {}
     for p in forced:
-        logic.set_forced(session, p, teams.get(p, "none"))
+        builder.forced(p, teams.get(p, "none"))
+    harness.use(builder.build())
 
 
 def slots(mode: DrawMode) -> int:

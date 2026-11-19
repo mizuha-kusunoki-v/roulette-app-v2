@@ -14,7 +14,8 @@ from roulette.logic import DOUBLE_MODES, SINGLE_MODES
 from roulette.models import DrawMode
 from roulette.snapshot import build_session_state
 from tests import harness
-from tests.simulation import draw, players, setup_session
+from tests.builders import SessionBuilder, players
+from tests.simulation import draw, setup_session
 
 
 def random_setup(rng: random.Random) -> None:
@@ -67,9 +68,15 @@ def test_no_draw_is_available_while_the_presentation_runs():
 
 
 def test_due_matches_who_the_miss_guarantee_would_pick():
-    setup_session(6, miss_threshold=3, excluded=["P01"])
-    harness.set_counts(miss={"P00": 3, "P01": 5, "P02": 2, "P03": 4})
-    harness.set_last_round_players(["P04", "P05"])
+    harness.use(
+        SessionBuilder()
+        .participants(6)
+        .settings(miss_threshold=3)
+        .excluded("P01")
+        .counts(miss={"P00": 3, "P01": 5, "P02": 2, "P03": 4})
+        .last_round(["P04", "P05"])
+        .build()
+    )
 
     due = {p.name for p in build_session_state(harness.session()).participants if p.due}
 
@@ -114,8 +121,9 @@ def test_session_is_served_over_http():
 
 
 def test_auto_forced_is_computed_from_the_current_state():
-    setup_session(10, auto_force=True)
-    harness.set_counts(participation={p: 4 for p in players(10) if p != "P00"})
+    harness.use(
+        SessionBuilder().participants(10).settings(auto_force=True).counts(participation={p: 4 for p in players(10) if p != "P00"}).build()
+    )
 
     assert [p.name for p in build_session_state(harness.session()).participants if p.auto_forced] == ["P00"]
 

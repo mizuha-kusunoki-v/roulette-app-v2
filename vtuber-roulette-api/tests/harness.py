@@ -4,7 +4,7 @@
 操作関数に渡す。HTTP のテストは app() を TestClient に渡せば、同じセッションを使う。
 
 テストは状態を操作 (logic の操作関数、router の API 関数) で作り、結果は名前で読む。
-画面の操作では作れない状態 (ミス回数が 5 回の人など) を作るときだけ、ここの set_* を使う。
+状態を作るのは tests/builders.py の SessionBuilder (画面の操作では作れない値もそこで入れる)。
 内部の持ち方を変えたら、ここだけを直せばほかのテストはそのまま通るはず。
 """
 
@@ -37,10 +37,10 @@ def session() -> RouletteState:
     return _app.state.session
 
 
-def new_session() -> RouletteState:
-    """POST /reset と同じく、セッションを作り直して差し替える。"""
-    _app.state.session = _app.state.session_factory.create()
-    return _app.state.session
+def use(session: RouletteState) -> RouletteState:
+    """作ったセッション (tests/builders.py) を、このテストのアプリに置く。"""
+    _app.state.session = session
+    return session
 
 # ── 読む ─────────────────────────────────────────────────────────────────────
 
@@ -167,19 +167,3 @@ def rollback() -> Iterator[None]:
     finally:
         for name in RouletteState.model_fields:
             setattr(session(), name, getattr(saved.model_copy(deep=True), name))
-
-
-# ── 画面の操作では作れない状態を作る ─────────────────────────────────────────
-
-
-def set_counts(*, participation: Dict[str, int] | None = None, miss: Dict[str, int] | None = None) -> None:
-    """参加回数・ミス回数を直接決める (書いていない人は 0)。"""
-    if participation is not None:
-        session().participation_counts = {p: participation.get(p, 0) for p in session().participants}
-    if miss is not None:
-        session().miss_counts = {p: miss.get(p, 0) for p in session().participants}
-
-
-def set_last_round_players(names: List[str]) -> None:
-    """最新の回に出た人を直接決める。"""
-    session().last_players = list(names)
