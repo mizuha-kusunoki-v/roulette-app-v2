@@ -62,7 +62,7 @@ def miss_threshold() -> int:
 
 
 def phase() -> str:
-    return session().phase
+    return logic.phase(session())
 
 
 def round_id() -> str | None:

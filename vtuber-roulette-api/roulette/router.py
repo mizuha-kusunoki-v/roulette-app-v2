@@ -21,8 +21,10 @@ from .logic import (
     draw_blocker,
     find_participant,
     latest_round,
-    new_record,
+    mark_presented,
+    new_round,
     participant_names,
+    phase,
     remove_participant,
     replace_participants,
     save_settings,
@@ -141,7 +143,7 @@ def draw(req: DrawRequest, session: RouletteState = Session):
             break
     apply_draw_result(
         session,
-        new_record(
+        new_round(
             round_id=str(uuid.uuid4()),
             drawn_at=datetime.now(timezone.utc).isoformat(),
             result=result,
@@ -158,17 +160,14 @@ def draw(req: DrawRequest, session: RouletteState = Session):
 
 @router.post("/presentation_complete")
 def presentation_complete(req: PresentationCompleteRequest, session: RouletteState = Session):
-    latest = latest_round(session)
-    if latest is None or req.round_id != latest.round_id:
+    if not mark_presented(session, req.round_id):
         return {"ok": False, "reason": "round_id_mismatch"}
-
-    session.phase = "result"
     return {"ok": True}
 
 
 @router.delete("/history/{round_id}")
 def delete_history(round_id: str, session: RouletteState = Session):
-    if session.phase == "spinning":
+    if phase(session) == "spinning":
         raise HTTPException(status_code=400, detail="抽選演出中は削除できません")
     if not delete_history_record(session, round_id):
         raise HTTPException(status_code=404, detail="指定した抽選結果が見つかりません")

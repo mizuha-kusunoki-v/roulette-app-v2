@@ -8,8 +8,10 @@ import random
 from dataclasses import dataclass
 from typing import List
 
+from roulette import router
 from roulette.logic import build_result, delete_history_record, replace_participants
 from roulette.models import Selection
+from roulette.protocol import PresentationCompleteRequest
 from tests import harness
 from tests.builders import players
 from tests.simulation import draw, setup_session
@@ -128,3 +130,36 @@ def test_removing_a_participant_drops_them_from_the_latest_rounds():
     assert set(harness.participation_counts()) == set(harness.participants())
     assert harness.counts() == harness.recount()
 
+
+def test_phase_follows_the_latest_round():
+    setup_session(6)
+    assert harness.phase() == "idle"
+
+    draw("standard_4")
+    assert harness.phase() == "spinning"
+
+    harness.finish_presentation()
+    assert harness.phase() == "result"
+
+
+def test_a_round_replaced_by_a_new_draw_counts_as_presented():
+    # 演出が終わる前に次の抽選をした場合 (API を直接呼ぶなど)。最新の回を消すと、置き換わった回の結果表示に戻る
+    setup_session(6)
+    draw("standard_4")
+    draw("standard_4")
+
+    assert delete_history_record(harness.session(), harness.round_id())
+
+    assert harness.phase() == "result"
+
+
+def test_presentation_complete_for_another_round_changes_nothing():
+    setup_session(6)
+    draw("standard_4")
+    old = harness.round_id()
+    draw("standard_4")
+
+    res = router.presentation_complete(PresentationCompleteRequest(round_id=old), harness.session())
+
+    assert res == {"ok": False, "reason": "round_id_mismatch"}
+    assert harness.phase() == "spinning"

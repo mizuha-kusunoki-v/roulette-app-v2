@@ -17,7 +17,12 @@ class RouletteResult(BaseModel):
     teams: List[ResultTeam]
 
 
-class DrawRecord(BaseModel):
+Phase = Literal["idle", "spinning", "result"]
+
+
+class Round(BaseModel):
+    """抽選の 1 回分。履歴はこれの配列で、最新の回は履歴の最後の要素。"""
+
     round_id: str
     drawn_at: str  # ISO8601
     result: RouletteResult
@@ -25,6 +30,7 @@ class DrawRecord(BaseModel):
     organizers: List[str]  # 抽選時点の有効な主催
     participants: List[str]  # 抽選時点の参加者
     reasons: Dict[str, str] = {}
+    presented: bool = False  # 演出が終わったか (次の回が足されたら、終わっていなくても済みにする)
 
 
 ForcedTeam = Literal["none", "A", "B"]  # "none" はチーム指定なし
@@ -48,13 +54,12 @@ class RouletteState(BaseModel):
     organizers: List[Organizer] = []
     miss_threshold: int = 3
     enable_auto_force: bool = False
-    # 履歴から数える集計 (logic._store_tally だけが書き込む)。最新の回は履歴から取り出すので持たない
+    # 抽選の履歴。最新の回、その前の回、進み具合 (logic.phase) はここから取り出す
+    history: List[Round] = []
+    # 履歴から数える集計 (logic._store_tally だけが書き込む。数え直すと遅いので保存する)
     participation_counts: Dict[str, int] = {}
     pair_counts: Dict[str, int] = {}
     miss_counts: Dict[str, int] = {}
-    # 最新の回の進み具合 (演出中か、結果を表示しているか)。これだけは履歴からわからないので持つ
-    phase: Literal["idle", "spinning", "result"] = "idle"
-    history: List[DrawRecord] = []
 
 
 
@@ -73,16 +78,6 @@ class Selection:
     def players(self) -> List[str]:
         """[チームA..., チームB...] の順。"""
         return self.team_a + self.team_b
-
-
-@dataclass(frozen=True)
-class LatestRound:
-    """最新の回。履歴の最後の記録から取り出す (logic.latest_round)。"""
-
-    round_id: str
-    result: RouletteResult
-    players: List[str]  # 出た人のうち、今も参加者にいる人 (チームA → チームB の順)
-    reasons: Dict[str, str]  # 選ばれた理由 (出た人全員の分)
 
 
 @dataclass(frozen=True)
