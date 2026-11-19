@@ -1,29 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { notifyPresentationComplete } from "../api/client";
-import { wsUrl } from "../api/endpoint";
-import { SessionState } from "../types";
+import { useSessionState } from "../session/useSessionState";
 import { getDisplayTeams } from "../utils/resultDisplay";
 import "./roulette.css";
 
 const ANIMATION_DURATION_MS = 5000;
 
 export const ResultViewerPage = () => {
-  const [serverState, setServerState] = useState<SessionState | null>(null);
+  const { state: serverState } = useSessionState();
   const [displayName, setDisplayName] = useState<string>("");
   const [animating, setAnimating] = useState(false);
 
   const lastRoundIdRef = useRef<string | null>(null);
   const completedRoundIdRef = useRef<string | null>(null);
   const intervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const ws = new WebSocket(wsUrl("/ws/session"));
-    ws.onmessage = (e) => {
-      const incoming = JSON.parse(e.data) as SessionState;
-      setServerState(incoming);
-    };
-    return () => ws.close();
-  }, []);
 
   useEffect(() => {
     return () => {

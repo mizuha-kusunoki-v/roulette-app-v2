@@ -1,7 +1,4 @@
-import { useEffect, useState } from "react";
-import { fetchSession, resetState } from "./api/client";
-import { wsUrl } from "./api/endpoint";
-import { SessionState } from "./types";
+import { resetState } from "./api/client";
 import { DrawSettings } from "./components/DrawSettings";
 import { HistoryList } from "./components/HistoryList";
 import { MatchInfo } from "./components/MatchInfo";
@@ -9,27 +6,10 @@ import { OrganizerSettings } from "./components/OrganizerSettings";
 import { ParticipantManager } from "./components/ParticipantManager";
 import { RouletteController } from "./components/RouletteController";
 import { RouletteDisplay } from "./components/RouletteDisplay";
+import { useSessionState } from "./session/useSessionState";
 
 const AdminApp = () => {
-  const [session, setSession] = useState<SessionState | null>(null);
-
-  const reload = async () => {
-    setSession(await fetchSession());
-  };
-
-  useEffect(() => {
-    reload();
-  }, []);
-
-  useEffect(() => {
-    const ws = new WebSocket(wsUrl("/ws/session"));
-
-    ws.onmessage = (e) => {
-      setSession(JSON.parse(e.data) as SessionState);
-    };
-
-    return () => ws.close();
-  }, []);
+  const { state: session, connection, refresh: reload } = useSessionState();
 
   const isLocked = session?.phase === "spinning";
 
@@ -44,6 +24,8 @@ const AdminApp = () => {
   return (
     <div>
       <h1>Roulette Admin</h1>
+      {connection === "connecting" && <p role="status">サーバーに接続しています...</p>}
+      {connection === "lost" && <p role="alert">サーバーとの接続が切れています。再接続しています...</p>}
 
       <OrganizerSettings
         organizerMode={session.organizer_mode}
