@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { notifyPresentationComplete } from "../api/client";
+import { wsUrl } from "../api/endpoint";
 import { RouletteState } from "../types";
 import { getDisplayTeams } from "../utils/resultDisplay";
 import "./roulette.css";
@@ -16,7 +17,7 @@ export const ResultViewerPage = () => {
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    const ws = new WebSocket(wsUrl("/ws"));
     ws.onmessage = (e) => {
       const incoming = JSON.parse(e.data) as RouletteState;
       setServerState(incoming);

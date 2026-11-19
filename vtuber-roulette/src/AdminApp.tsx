@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchState, resetState } from "./api/client";
+import { wsUrl } from "./api/endpoint";
 import { RouletteResult, RouletteState } from "./types";
 import { DrawSettings } from "./components/DrawSettings";
 import { HistoryList } from "./components/HistoryList";
@@ -24,7 +25,7 @@ const AdminApp = () => {
   }, []);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    const ws = new WebSocket(wsUrl("/ws"));
 
     ws.onmessage = (e) => {
       const incoming = JSON.parse(e.data) as RouletteState;

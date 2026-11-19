@@ -1,6 +1,6 @@
 import { DrawMode, OrganizerMode, RouletteState } from "../types";
+import { apiUrl } from "./endpoint";
 
-const BASE_URL = "http://localhost:8000";
 
 async function ensureOk(res: Response) {
   if (res.ok) return;
@@ -16,13 +16,13 @@ async function ensureOk(res: Response) {
 }
 
 export async function fetchState(): Promise<RouletteState> {
-  const res = await fetch(`${BASE_URL}/state`);
+  const res = await fetch(apiUrl("/state"));
   await ensureOk(res);
   return res.json();
 }
 
 export async function updateParticipants(participants: string[]) {
-  const res = await fetch(`${BASE_URL}/participants`, {
+  const res = await fetch(apiUrl("/participants"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ participants }),
@@ -35,7 +35,7 @@ export async function updateOrganizerConfig(
   organizers: string[],
   selectedOrganizerIndices: number[],
 ) {
-  const res = await fetch(`${BASE_URL}/organizer_config`, {
+  const res = await fetch(apiUrl("/organizer_config"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -51,7 +51,7 @@ export async function updateForcedPlayers(
   forcedPlayers: string[],
   forcedPlayerTeams: Record<string, "none" | "A" | "B"> = {},
 ) {
-  const res = await fetch(`${BASE_URL}/forced_players`, {
+  const res = await fetch(apiUrl("/forced_players"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ forced_players: forcedPlayers, forced_player_teams: forcedPlayerTeams }),
@@ -60,7 +60,7 @@ export async function updateForcedPlayers(
 }
 
 export async function updateExcludedPlayers(excludedPlayers: string[]) {
-  const res = await fetch(`${BASE_URL}/excluded_players`, {
+  const res = await fetch(apiUrl("/excluded_players"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ excluded_players: excludedPlayers }),
@@ -69,7 +69,7 @@ export async function updateExcludedPlayers(excludedPlayers: string[]) {
 }
 
 export async function draw(mode: DrawMode) {
-  const res = await fetch(`${BASE_URL}/draw`, {
+  const res = await fetch(apiUrl("/draw"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode }),
@@ -81,7 +81,7 @@ export async function draw(mode: DrawMode) {
 }
 
 export async function updateDrawSettings(missThreshold: number, enableAutoForce: boolean) {
-  const res = await fetch(`${BASE_URL}/draw_settings`, {
+  const res = await fetch(apiUrl("/draw_settings"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ miss_threshold: missThreshold, enable_auto_force: enableAutoForce }),
@@ -90,7 +90,7 @@ export async function updateDrawSettings(missThreshold: number, enableAutoForce:
 }
 
 export async function notifyPresentationComplete(roundId: string) {
-  const res = await fetch(`${BASE_URL}/presentation_complete`, {
+  const res = await fetch(apiUrl("/presentation_complete"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ round_id: roundId }),
@@ -99,7 +99,7 @@ export async function notifyPresentationComplete(roundId: string) {
 }
 
 export async function resetState() {
-  const res = await fetch(`${BASE_URL}/reset`, {
+  const res = await fetch(apiUrl("/reset"), {
     method: "POST",
   });
   await ensureOk(res);
@@ -107,7 +107,7 @@ export async function resetState() {
 
 
 export async function deleteHistoryRecord(roundId: string) {
-  const res = await fetch(`${BASE_URL}/history/${encodeURIComponent(roundId)}`, {
+  const res = await fetch(apiUrl(`/history/${encodeURIComponent(roundId)}`), {
     method: "DELETE",
   });
   await ensureOk(res);
