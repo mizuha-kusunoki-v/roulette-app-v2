@@ -33,29 +33,42 @@ React (Vite) フロントエンド + FastAPI バックエンドの構成で動�
 ## フォルダ構成
 
 ```
-roulette-app_new/
-├── vtuber-roulette/         # フロントエンド (React + Vite)
-│   ├── index.html           # エントリー HTML
-│   ├── vite.config.ts       # Vite 設定 (開発サーバーは port 3000)
+roulette-app-v2/
+├── vtuber-roulette/             # フロントエンド (React + Vite)
+│   ├── index.html               # エントリー HTML
+│   ├── vite.config.ts           # Vite 設定 (開発サーバーは port 3000)
 │   └── src/
-│       ├── AdminApp.tsx     # 管理画面
-│       ├── App.tsx          # OBS ビュワー統合
-│       ├── components/      # UI コンポーネント群
-│       ├── api/client.ts    # バックエンド API クライアント
-│       └── types.ts         # 型定義
+│       ├── AdminApp.tsx         # 管理画面
+│       ├── App.tsx              # ルーティング (管理画面 / OBS ビュワー)
+│       ├── components/          # 管理画面の部品
+│       ├── viewer/              # OBS ビュワー (スロット演出と結果表示)
+│       ├── utils/               # 表示用の小さな関数
+│       ├── api/
+│       │   ├── client.ts        # 操作 API の呼び出し
+│       │   ├── endpoint.ts      # 接続先 (VITE_API_BASE)
+│       │   └── schema.ts        # OpenAPI から生成した型 (手で編集しない)
+│       └── types.ts             # 生成した型に名前を付けたもの
 │
-├── vtuber-roulette-api/     # バックエンド (FastAPI)
-│   ├── main.py              # アプリエントリーポイント
-│   ├── draw_config.py       # 自動強制抽選のパラメータ設定
-│   ├── pyproject.toml       # 依存定義 (uv)
-│   ├── uv.lock              # 依存のバージョン固定 (uv が生成)
-│   └── roulette/            # 抽選ルーレットモジュール
-│       ├── logic.py         # 抽選ロジック
-│       ├── models.py        # データモデル
-│       └── router.py        # API ルーター
+├── vtuber-roulette-api/         # バックエンド (FastAPI)
+│   ├── main.py                  # アプリの組み立て (composition root: create_app)
+│   ├── draw_config.py           # 自動強制抽選のパラメータ設定
+│   ├── export_openapi.py        # openapi.json を書き出す
+│   ├── openapi.json             # フロントとの契約 (書き出してコミットする)
+│   ├── pyproject.toml           # 依存定義 (uv)
+│   ├── uv.lock                  # 依存のバージョン固定 (uv が生成)
+│   ├── roulette/
+│   │   ├── models.py            # 内部の状態 (参加者・主催・履歴・集計) と抽選で使う値
+│   │   ├── logic.py             # 抽選のルールと操作 (セッションを引数で受け取る)
+│   │   ├── protocol.py          # フロントとのプロトコル (送る状態・受け取る操作の形)
+│   │   ├── snapshot.py          # 内部の状態からプロトコルの状態を組み立てる
+│   │   ├── messages.py          # 利用者に見せる文言
+│   │   ├── sessions.py          # セッションを作る (SessionFactory)
+│   │   ├── changes.py           # 状態の変化を WebSocket に知らせる
+│   │   └── router.py            # API と WebSocket のエンドポイント
+│   └── tests/                   # uv run pytest (builders.py と harness.py だけが内部の状態の形を知る)
 │
-├── setup.bat                # 初回セットアップスクリプト (Windows)
-└── start.bat                # ワンクリック起動スクリプト (Windows)
+├── setup.bat                    # 初回セットアップスクリプト (Windows)
+└── start.bat                    # ワンクリック起動スクリプト (Windows)
 ```
 
 ---
