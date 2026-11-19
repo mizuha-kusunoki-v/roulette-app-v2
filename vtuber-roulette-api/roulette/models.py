@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, List, Literal
 
 from pydantic import BaseModel
@@ -48,3 +49,40 @@ class RouletteState(BaseModel):
     round_id: str | None = None
     phase: Literal["idle", "spinning", "result"] = "idle"
     history: List[DrawRecord] = []
+
+
+# ── 抽選できない理由 (logic.draw_blocker が返す) ──────────────────────────────
+# 文言は持たない。利用者向けの文言は messages.py が組み立てる。
+
+
+@dataclass(frozen=True)
+class ModeNotAvailable:
+    """今の主催モードでは使えない抽選モード。"""
+
+
+@dataclass(frozen=True)
+class OrganizersRequired:
+    required: int
+    active: int
+
+
+@dataclass(frozen=True)
+class TeamForcedOverSlots:
+    team: Literal["A", "B"]
+    forced: int
+    slots: int
+
+
+@dataclass(frozen=True)
+class TooManyForced:
+    forced: int
+    slots: int
+
+
+@dataclass(frozen=True)
+class NotEnoughParticipants:
+    needed: int
+    eligible: int
+
+
+DrawBlock = ModeNotAvailable | OrganizersRequired | TeamForcedOverSlots | TooManyForced | NotEnoughParticipants

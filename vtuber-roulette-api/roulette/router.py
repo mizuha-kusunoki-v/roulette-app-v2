@@ -24,6 +24,7 @@ from .logic import (
     set_forced,
     state,
 )
+from .messages import describe_draw_block, forced_limit_exceeded
 from .protocol import (
     DrawRequest,
     ParticipantRequest,
@@ -79,7 +80,7 @@ def post_participant_forced(req: SetForcedRequest):
     try:
         set_forced(req.name, team)
     except ForcedLimitError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=forced_limit_exceeded(e.limit))
     return {"ok": True}
 
 
@@ -110,9 +111,9 @@ def put_settings(req: SaveSettingsRequest):
 
 @router.post("/draw")
 def draw(req: DrawRequest):
-    blocker = draw_blocker(req.mode)
-    if blocker:
-        raise HTTPException(status_code=400, detail=blocker)
+    block = draw_blocker(req.mode)
+    if block is not None:
+        raise HTTPException(status_code=400, detail=describe_draw_block(block))
 
     for attempt in range(_PAIR_RETRY_MAX + 1):
         selected, spin_order, selection_reasons = select_players(req.mode)

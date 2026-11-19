@@ -10,7 +10,20 @@ from draw_config import (
     AUTO_FORCE_MAX_PER_DRAW,
     AUTO_FORCE_MEDIAN_GAP,
 )
-from .models import DrawMode, DrawRecord, OrganizerMode, ResultTeam, RouletteResult, RouletteState
+from .models import (
+    DrawBlock,
+    DrawMode,
+    DrawRecord,
+    ModeNotAvailable,
+    NotEnoughParticipants,
+    OrganizerMode,
+    OrganizersRequired,
+    ResultTeam,
+    RouletteResult,
+    RouletteState,
+    TeamForcedOverSlots,
+    TooManyForced,
+)
 
 # ── グローバル状態 ─────────────────────────────────────────────────────────────
 
@@ -66,6 +79,10 @@ def get_team_slots(mode: DrawMode) -> tuple[int, int]:
 class ForcedLimitError(Exception):
     """手動強制の人数が上限を超える。"""
 
+    def __init__(self, limit: int):
+        super().__init__(limit)
+        self.limit = limit
+
 
 def _drop_records_of_non_participants() -> None:
     """参加者でなくなった人の強制・除外・前回参加などの記録を消す。"""
@@ -105,7 +122,7 @@ def set_forced(name: str, team: str | None) -> None:
     else:
         if name not in state.forced_players:
             if len(state.forced_players) >= forced_players_limit():
-                raise ForcedLimitError(f"手動強制は最大{forced_players_limit()}人までです")
+                raise ForcedLimitError(forced_players_limit())
             state.forced_players = state.forced_players + [name]
         state.forced_player_teams = {**state.forced_player_teams, name: team}
     state.auto_forced_players = compute_auto_forced_players(state.forced_players)
@@ -195,31 +212,47 @@ def is_due(name: str) -> bool:
     )
 
 
-def draw_blocker(mode: DrawMode) -> str | None:
+# ── 抽選できない理由 ─────────────────────────────────────────────────────────
+# 判定は理由の種類と数値 (models.DrawBlock) だけを返す。利用者向けの文言は messages.py が組み立てる。
+
+
+def forced_count_by_team(forced: List[str]) -> Dict[str, int]:
+    """チームを指定した手動強制の人数。チーム指定なしは数えない。"""
+    counts = {"A": 0, "B": 0}
+    for p in forced:
+        team = state.forced_player_teams.get(p)
+        if team in counts:
+            counts[team] += 1
+    return counts
+
+
+def eligible_count(forced: List[str]) -> int:
+    """抽選に出られる人数 (除外中でない参加者と、除外中でも手動強制している人)。"""
+    return len({p for p in state.participants if p not in state.excluded_players} | set(forced))
+
+
+def draw_blocker(mode: DrawMode) -> DrawBlock | None:
     """この mode で今は抽選できない理由を返す。抽選できるなら None。
 
     抽選 API と画面のボタンの可否の両方がこれを使う。抽選演出中かどうかは見ない。
     """
     if mode not in modes_for_organizer_mode():
-        return "今の主催モードでは実行できない抽選です"
+        return ModeNotAvailable()
     if state.organizer_mode == "double" and len(active_organizers()) < 2:
-        return "主催2人モードでは主催を2人選択してください"
+        return OrganizersRequired(required=2, active=len(active_organizers()))
 
-    team_a_slots, team_b_slots = get_team_slots(mode)
-    total_slots = team_a_slots + team_b_slots
+    team_slots = dict(zip(("A", "B"), get_team_slots(mode)))
+    total_slots = sum(team_slots.values())
     forced = manual_forced_players()
-    team_a_forced = sum(1 for p in forced if state.forced_player_teams.get(p) == "A")
-    team_b_forced = sum(1 for p in forced if state.forced_player_teams.get(p) == "B")
-    if team_a_forced > team_a_slots:
-        return f"チームAの強制人数（{team_a_forced}人）が抽選枠（{team_a_slots}人）を超えています"
-    if team_b_forced > team_b_slots:
-        return f"チームBの強制人数（{team_b_forced}人）が抽選枠（{team_b_slots}人）を超えています"
+    for team, count in forced_count_by_team(forced).items():
+        if count > team_slots[team]:
+            return TeamForcedOverSlots(team=team, forced=count, slots=team_slots[team])  # type: ignore[arg-type]
     if len(forced) > total_slots:
-        return f"{total_slots}人抽選では手動強制は{total_slots}人以内にしてください（現在{len(forced)}人選択中）"
+        return TooManyForced(forced=len(forced), slots=total_slots)
 
-    eligible = {p for p in state.participants if p not in state.excluded_players} | set(forced)
-    if len(eligible) < total_slots:
-        return f"{total_slots}人抽選には、除外を除いて{total_slots}人以上の参加者が必要です"
+    eligible = eligible_count(forced)
+    if eligible < total_slots:
+        return NotEnoughParticipants(needed=total_slots, eligible=eligible)
     return None
 
 

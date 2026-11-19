@@ -14,6 +14,7 @@ from .logic import (
     modes_for_organizer_mode,
     state,
 )
+from .messages import PRESENTATION_RUNNING, describe_draw_block
 from .models import DrawMode
 from .protocol import (
     CurrentRound,
@@ -36,7 +37,11 @@ def _forced_team(name: str) -> ForcedTeam | None:
 
 
 def _draw_option(mode: DrawMode) -> DrawOption:
-    reason = "抽選演出中です" if state.phase == "spinning" else draw_blocker(mode)
+    if state.phase == "spinning":
+        reason: str | None = PRESENTATION_RUNNING
+    else:
+        block = draw_blocker(mode)
+        reason = None if block is None else describe_draw_block(block)
     return DrawOption(mode=mode, available=reason is None, unavailable_reason=reason)
 
 
