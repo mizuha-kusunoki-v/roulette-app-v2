@@ -1,10 +1,15 @@
+import itertools
+import math
 import random
 import statistics
-from typing import Dict, List, Sequence
+from typing import Dict, List
 
 from draw_config import (
     AUTO_FORCE_MAX_PER_DRAW,
     AUTO_FORCE_MEDIAN_GAP,
+    DEFICIT_WEIGHT,
+    PAIR_PENALTY,
+    WAIT_WEIGHT,
 )
 from .models import (
     DrawBlock,
@@ -26,6 +31,7 @@ from .models import (
     TeamForcedOverSlots,
     TooManyForced,
 )
+from .sampler import weighted_subset
 
 # ── セッション ───────────────────────────────────────────────────────────────
 # 抽選の状態 (RouletteState) はグローバルに持たず、使う関数が引数 session で受け取る。
@@ -201,21 +207,20 @@ def compute_auto_forced_players(
     return picked[:max_per_draw] if max_per_draw > 0 else picked
 
 
-def auto_forced_players(session: RouletteState, already_selected: Sequence[str] = ()) -> List[str]:
+def auto_forced_players(session: RouletteState) -> List[str]:
     """今の状態で、次の抽選の自動強制の対象になる人。
 
     状態から導く値なので保存せず、必要なとき (抽選、画面に送る状態の組み立て) に毎回計算する。
-    手動強制・前回出た人・除外中・ミス回数の保証の対象・already_selected は候補から外す。
+    手動強制・前回出た人・除外中・次回の優先対象 (due_players) は候補から外す。
     """
     if not session.enable_auto_force:
         return []
-    skip = set(last_round_players(session)) | set(already_selected)
+    skip = set(last_round_players(session)) | due_players(session)
     candidates = [
         p.name for p in session.participants
         if p.forced is None
         and not p.excluded
         and p.name not in skip
-        and session.miss_counts.get(p.name, 0) < session.miss_threshold
     ]
     return compute_auto_forced_players(
         {p: session.participation_counts.get(p, 0) for p in participant_names(session)},
@@ -243,14 +248,15 @@ def manual_forced_players(session: RouletteState) -> List[str]:
 
 
 def due_players(session: RouletteState) -> set[str]:
-    """ミス回数の保証の対象。次の抽選で、枠が足りる限り手動強制の次に優先して選ばれる。"""
-    last = set(last_round_players(session))
-    return {
-        p.name for p in session.participants
-        if p.name not in last
-        and not p.excluded
-        and session.miss_counts.get(p.name, 0) >= session.miss_threshold
-    }
+    """次回の優先対象: 一番長く (連続で) 外れている人。次の抽選で、このうち 1 人は必ず選ばれる。
+
+    手動強制 (もともと必ず選ばれる) と除外中の人は含めない。全員が 0 回 (最初の抽選など) なら誰もいない。
+    回数の決まった区切り (「N 回外れたら必ず」) にしないのは、そうすると同じ回に外れた人どうしが
+    そろって確定で入り続け、顔ぶれが固定されるため (1 人だけなら固定されない)。
+    """
+    candidates = {p.name: session.miss_counts.get(p.name, 0) for p in session.participants if p.forced is None and not p.excluded}
+    longest = max(candidates.values(), default=0)
+    return {p for p, n in candidates.items() if n == longest} if longest > 0 else set()
 
 
 # ── 抽選できない理由 ─────────────────────────────────────────────────────────
@@ -305,59 +311,134 @@ class NotEnoughCandidates(Exception):
     """枠を埋められなかった。draw_blocker が先に弾くので、起きたらバグ。"""
 
 
-def _shuffled(names: List[str]) -> List[str]:
-    names = list(names)
-    random.shuffle(names)
-    return names
+ENUM_LIMIT = 500  # 誰が出るか × チーム分けの組み合わせがこれ以下なら、全部列挙して引く
+_REJECT_MAX = 200  # 組み合わせが多いときの、対戦カードの減点で引き直す回数の上限
+_SCORE_GAP_MAX = 700.0  # exp(-700) は 0 にならない。これより大きい点数の差は同じ扱いにする
 
 
-def _longest_wait_first(session: RouletteState, names: List[str]) -> List[str]:
-    """ミス回数の多い順。同じ回数どうしは参加者リストの順で決めない。"""
-    return sorted(_shuffled(names), key=lambda p: session.miss_counts.get(p, 0), reverse=True)
+def _score(session: RouletteState, median: float, p: str) -> float:
+    """選ばれやすさの点数。外れた回数が多いほど高い。自動強制が ON なら、参加回数が中央値より少ないほど高い。"""
+    score = WAIT_WEIGHT * session.miss_counts.get(p, 0)
+    if session.enable_auto_force:
+        score += DEFICIT_WEIGHT * max(0.0, median - session.participation_counts.get(p, 0))
+    return score
 
 
-def _choose_players(session: RouletteState, c: DrawConstraints) -> Dict[str, str]:
-    """誰が出るかを、優先度の高い順に決める。チームはまだ決めない。戻り値は {名前: 選ばれた理由}。
-
-    手動強制 → ミス回数の保証 → 自動強制 → ランダム → 前回参加者からの補充。
-    """
-    chosen = {p: "manual_check" for p in c.forced}
-
-    def add(candidates: List[str], reason: str) -> None:
-        for p in candidates:
-            if len(chosen) >= c.total_slots:
-                return
-            chosen.setdefault(p, reason)
-
-    # 前回出た人は、ほかの候補で埋まらないときだけ補充に使う
+def _reasons(session: RouletteState, c: DrawConstraints, players: List[str]) -> Dict[str, str]:
+    """選ばれた人の理由を、選ばれる前のその人の状態から決める (表示用)。"""
     last = set(last_round_players(session))
-    fresh = [p for p in c.pool if p not in last]
     due = due_players(session)
-    add(_longest_wait_first(session, [p for p in fresh if p in due]), "miss_3")
-    add(auto_forced_players(session, list(chosen)), "median_gap")
-    add(_shuffled([p for p in fresh if p not in chosen]), "random")
-    add(_shuffled([p for p in c.pool if p in last]), "exception_prev_round")
-    return chosen
+    below = set(auto_forced_players(session))
+    forced = set(c.forced)
+
+    def why(p: str) -> str:
+        if p in forced:
+            return "manual_check"
+        if p in last:
+            return "exception_prev_round"
+        if p in due:
+            return "miss_3"
+        if p in below:
+            return "median_gap"
+        return "random"
+
+    return {p: why(p) for p in players}
 
 
-def _assign_teams(c: DrawConstraints, chosen: Dict[str, str]) -> Selection:
-    """チーム指定ありの手動強制を指定のチームに置き、残りはシャッフルして空いている枠に入れる。
+Teams = tuple[List[str], List[str]]
 
-    選ばれた理由でチームが偏らないように、チーム分けは誰が出るかを決めたあとに行う。
-    """
-    teams = {t: list(c.fixed[t]) for t in ("A", "B")}
+
+def _splits(c: DrawConstraints, chosen: List[str]) -> List[Teams]:
+    """チーム指定の手動強制を指定のチームに置いたうえでの、ありうるチーム分け (チームA, チームB)。"""
     fixed = set(c.fixed["A"]) | set(c.fixed["B"])
-    for p in _shuffled([p for p in chosen if p not in fixed]):
-        teams["A" if len(teams["A"]) < c.slots["A"] else "B"].append(p)
-    return Selection(team_a=teams["A"], team_b=teams["B"], reasons=dict(chosen))
+    free = [p for p in chosen if p not in fixed]
+    room_a = c.slots["A"] - len(c.fixed["A"])
+    out = []
+    for a in itertools.combinations(free, room_a):
+        b = [p for p in free if p not in a]
+        out.append((list(c.fixed["A"]) + list(a), list(c.fixed["B"]) + b))
+    return out
 
 
 def select_players(session: RouletteState, mode: DrawMode) -> Selection:
+    """手動強制と、一番長く外れている人のうち 1 人を入れ、残りの枠を重み付きで引いて、チームに分ける。
+
+    必ず守ること (優先の高い順):
+    1. 手動強制 (チーム指定を含む) と除外
+    2. 前回出た人は、ほかの人で枠が埋まるなら出ない (埋まらないときだけ、前回出た人から足す)
+    3. 一番長く外れている人のうち 1 人 (due_players から一様に選ぶ)
+    残りの枠は、外れた回数と参加回数 (自動強制が ON のとき) の点数で重み付きに引く。
+    ありうる結果 (誰が出るか + チーム分け) のそれぞれが出る確率は
+    「引いた人の exp(点数) の積 × exp(-PAIR_PENALTY × その対戦カードが過去に出た回数)」に比例する。
+    組み合わせが ENUM_LIMIT 以下なら全部列挙して引く。多いときは、人を重みの積に比例して引き、
+    チーム分けを一様に引いてから、対戦カードの減点の分だけの確率で採用する (どちらも同じ確率になる)。
+    """
     c = draw_constraints(session, mode)
-    chosen = _choose_players(session, c)
-    if len(chosen) < c.total_slots:
+    sure = list(c.forced)
+    need = c.total_slots - len(sure)
+    if not 0 <= need <= len(c.pool):
         raise NotEnoughCandidates()
-    return _assign_teams(c, chosen)
+    last = set(last_round_players(session))
+    fresh = [p for p in c.pool if p not in last]
+    # 一番長く外れている人は連続で外れた回数が 1 以上なので、前回出た人は含まない
+    longest = sorted(due_players(session))
+    if longest and need > 0:
+        guaranteed = random.choice(longest)
+        sure.append(guaranteed)
+        fresh.remove(guaranteed)
+        need -= 1
+    if len(fresh) >= need:
+        tier = fresh
+    else:
+        # 前回出ていない人だけでは埋まらない: その人たちは全員入れ、残りを前回出た人から引く
+        sure += fresh
+        need -= len(fresh)
+        tier = [p for p in c.pool if p in last]
+    # チームの中の並び順に、参加者リストの順や手動強制かどうかが出ないようにする。確率には影響しない
+    random.shuffle(sure)
+    random.shuffle(tier)
+
+    median = statistics.median(session.participation_counts.values()) if session.participation_counts else 0.0
+    scores = [_score(session, median, p) for p in tier]
+    top = max(scores, default=0.0)
+    # 点数の差が _SCORE_GAP_MAX を超えると exp が 0 に丸められる。それより大きい差は同じ扱いにする
+    weight = {p: math.exp(max(s - top, -_SCORE_GAP_MAX)) for p, s in zip(tier, scores)}
+    organizers = active_organizers(session)
+    id_of = {p.name: p.id for p in session.participants}
+
+    def repeats(teams: Teams) -> int:
+        lineup = _lineup(mode, [id_of[p] for p in teams[0] + teams[1]], organizers)
+        return session.pair_counts.get(compute_matchup_key([players for _, players in lineup]), 0)
+
+    def selection(teams: Teams) -> Selection:
+        # 理由は選ばれた 1 つの分だけ決める (候補ごとに決めると遅い)
+        a, b = teams
+        return Selection(team_a=a, team_b=b, reasons=_reasons(session, c, a + b))
+
+    n_splits = len(_splits(c, sure + tier[:need]))
+    if math.comb(len(tier), need) * n_splits <= ENUM_LIMIT:
+        options: List[Teams] = []
+        weights: List[float] = []
+        for picked in itertools.combinations(tier, need):
+            w = math.prod(weight[p] for p in picked)
+            for teams in _splits(c, sure + list(picked)):
+                options.append(teams)
+                weights.append(w * math.exp(-PAIR_PENALTY * repeats(teams)))
+        return selection(random.choices(options, weights=weights)[0])
+
+    best: tuple[int, Teams] | None = None
+    for _ in range(_REJECT_MAX):
+        picked = weighted_subset(tier, [weight[p] for p in tier], need)
+        teams = random.choice(_splits(c, sure + picked))
+        n = repeats(teams)
+        if random.random() < math.exp(-PAIR_PENALTY * n):
+            return selection(teams)
+        if best is None or n < best[0]:
+            best = (n, teams)
+    # 組み合わせが ENUM_LIMIT より多いのに採用されないのは、ほとんどの組み合わせが何度も出たとき。
+    # 確率どおりではなくなるが、引いた中で一番出ていないものにする
+    assert best is not None
+    return selection(best[1])
 
 
 def _lineup(mode: DrawMode, picked: List[str], organizers: List[str]) -> List[tuple[str, List[str]]]:

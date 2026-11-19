@@ -67,20 +67,26 @@ def test_no_draw_is_available_while_the_presentation_runs():
     assert all(not o.available for o in build_session_state(harness.session()).draw_options)
 
 
-def test_due_matches_who_the_miss_guarantee_would_pick():
+def test_due_is_everyone_who_waited_longest_except_forced_and_excluded():
     harness.use(
         SessionBuilder()
         .participants(6)
-        .settings(miss_threshold=3)
         .excluded("P01")
-        .counts(miss={"P00": 3, "P01": 5, "P02": 2, "P03": 4})
-        .last_round(["P04", "P05"])
+        .forced("P04")
+        .counts(miss={"P00": 3, "P01": 5, "P02": 2, "P03": 3, "P04": 6})
+        .last_round(["P05"])
         .build()
     )
 
     due = {p.name for p in build_session_state(harness.session()).participants if p.due}
 
-    assert due == {"P00", "P03"}  # P01 は除外中、P02 は規定未満
+    assert due == {"P00", "P03"}  # P01 は除外中、P04 は手動強制 (もともと必ず選ばれる)、P02 は短い
+
+
+def test_nobody_is_due_before_anyone_has_missed():
+    harness.use(SessionBuilder().participants(6).build())
+
+    assert not any(p.due for p in build_session_state(harness.session()).participants)
 
 
 def test_forced_is_reported_per_participant():

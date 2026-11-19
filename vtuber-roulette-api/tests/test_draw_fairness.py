@@ -10,7 +10,7 @@ import statistics
 import pytest
 
 from draw_config import AUTO_FORCE_MEDIAN_GAP
-from roulette import router
+from roulette import logic
 from tests import harness
 from tests.builders import players
 from tests.simulation import (
@@ -23,7 +23,7 @@ from tests.simulation import (
 )
 
 SEEDS = range(5)
-# 重複ペア抑制の効き目は種ごとのばらつきが大きく、5 通りの平均では 0.6〜0.9 倍に振れる。20 通りなら安定する
+# 重複ペア抑制の効き目は種ごとのばらつきが大きいので、20 通りの平均で見る
 PAIR_SEEDS = range(20)
 ROUNDS = 200
 
@@ -50,7 +50,7 @@ def test_nobody_waits_much_longer_than_a_fair_rotation(n, mode, seed):
 
     history = run(mode, ROUNDS)
 
-    bound = fair_wait_bound(n, mode, harness.miss_threshold())
+    bound = fair_wait_bound(n, mode)
     assert max_miss_streak(history, players(n)) <= bound
 
 
@@ -76,9 +76,9 @@ def test_auto_force_keeps_everyone_near_the_median(n, seed):
 
 
 @pytest.mark.parametrize("n", [5, 6, 7])
-def test_pair_suppression_spreads_matchups_more_evenly(n):
-    def average_sd(retry_max: int) -> float:
-        router._PAIR_RETRY_MAX = retry_max
+def test_pair_suppression_spreads_matchups_more_evenly(n, monkeypatch):
+    def average_sd(penalty: float) -> float:
+        monkeypatch.setattr(logic, "PAIR_PENALTY", penalty)
         values = []
         for seed in PAIR_SEEDS:
             random.seed(seed)
@@ -87,10 +87,12 @@ def test_pair_suppression_spreads_matchups_more_evenly(n):
             values.append(matchup_repeat_sd())
         return statistics.mean(values)
 
-    without = average_sd(0)
-    with_suppression = average_sd(10)
+    penalty = logic.PAIR_PENALTY
+    without = average_sd(0.0)
+    with_suppression = average_sd(penalty)
 
-    assert with_suppression < without * 0.8, (with_suppression, without)
+    # 減点 1 で 5 人 0.22 倍、6 人 0.36 倍、7 人 0.54 倍 (2026-11-20 測定)
+    assert with_suppression < without * 0.7, (with_suppression, without)
 
 
 # チーム A の枠の割合 (4 人抽選は 2/4、3 人抽選は 1/3)

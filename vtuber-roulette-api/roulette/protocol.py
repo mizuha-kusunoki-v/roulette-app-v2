@@ -51,7 +51,7 @@ class ParticipantStatus(BaseModel):
     forced: ForcedTeam | None  # None = 手動強制なし、"any" = チーム指定なし
     excluded: bool
     auto_forced: bool  # 次の抽選で自動強制 (参加回数の中央値差) の対象
-    due: bool  # 次の抽選でミス回数の保証の対象
+    due: bool  # 次回の優先対象 (一番長く外れている人。次の抽選で、このうち 1 人は必ず選ばれる)
 
 
 class Settings(BaseModel):

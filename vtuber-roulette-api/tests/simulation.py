@@ -1,6 +1,6 @@
 """抽選ロジックの評価用シミュレーションと評価関数。
 
-抽選は API と同じ入口 (router.draw) から呼ぶので、重複ペア抑制の再抽選も含めて評価できる。
+抽選は API と同じ入口 (router.draw) から呼ぶので、集計の更新も含めて評価できる。
 状態は操作 (logic の操作関数) で作り、結果は tests/harness.py を通して名前で読む。
 状態はモジュールのグローバルなので、各テストの前に conftest がリセットする。
 """
@@ -113,13 +113,13 @@ def matchup_repeat_sd() -> float:
     return statistics.pstdev(Counter(harness.pair_counts()).values())
 
 
-def fair_wait_bound(n_candidates: int, mode: DrawMode, miss_threshold: int) -> int:
+def fair_wait_bound(n_candidates: int, mode: DrawMode) -> int:
     """連続で外れる回数の上限の目安。
 
-    全員を順番に回すと ceil(n / 枠) 回に 1 回は出番が来る。ミス回数の保証は miss_threshold 回で効く。
-    どちらか遅い方に、同時に保証対象が重なったときの 1 回分を足す。
+    全員を順番に回すと ceil(n / 枠) 回に 1 回は出番が来る。一番長く外れている人は 1 人ずつしか確定で入らないので、
+    同じ回数で並んだ人がいると 1 回分遅れることがある。その 1 回分を足す。
     """
-    return max(miss_threshold, math.ceil(n_candidates / slots(mode))) + 1
+    return math.ceil(n_candidates / slots(mode)) + 1
 
 
 @dataclass

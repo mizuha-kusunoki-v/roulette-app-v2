@@ -15,6 +15,13 @@ from tests.simulation import Scenario, draw, setup_session, slots
 MODES = ("standard_3", "standard_4", "hosts_vs_duo", "hosts_split_pairs")
 
 
+@pytest.fixture(autouse=True, params=["enumerate", "sample"])
+def draw_path(request, monkeypatch):
+    """組み合わせを全部列挙する道と、重みで引いてから採用を決める道 (大人数のとき) の両方でルールを確かめる。"""
+    if request.param == "sample":
+        monkeypatch.setattr(logic, "ENUM_LIMIT", 0)
+
+
 def random_scenario(rng: random.Random) -> Scenario:
     mode = rng.choice(MODES)
     n = rng.randint(slots(mode) + 1, 16)
@@ -99,7 +106,24 @@ def test_forced_team_is_respected(mode):
         assert "P07" in r.team_a
 
 
+def test_one_of_the_players_who_waited_longest_is_always_selected():
+    # 一番長く連続で外れている人 (手動強制・除外中を除く) のうち、少なくとも 1 人は必ず選ばれる
+    # (手動強制で枠が埋まっているときは入る枠がないので除く)
+    checked = 0
+    for s, history in scenario_rounds():
+        for r in history:
+            b = r.before
+            waiting = {p: b.miss_counts[p] for p in b.participants if p not in s.excluded and p not in s.forced}
+            longest = max(waiting.values(), default=0)
+            if longest == 0 or len(s.forced) >= slots(s.mode):
+                continue
+            checked += 1
+            assert {p for p, n in waiting.items() if n == longest} & set(r.selected), (s, waiting, r.reasons)
+    assert checked > 500
+
+
 def test_players_from_last_round_rest_when_enough_others_are_available():
+    # 前回出た人は、ほかの人で枠が埋まるなら出ない (手動強制は別)
     for s, history in scenario_rounds():
         for r in history:
             last = set(r.before.last_round_players)
@@ -107,22 +131,6 @@ def test_players_from_last_round_rest_when_enough_others_are_available():
             if len(others) >= slots(s.mode):
                 repeated = (set(r.selected) & last) - set(s.forced)
                 assert not repeated, (s, r.reasons)
-
-
-def test_players_who_missed_too_often_are_selected_when_they_fit():
-    for s, history in scenario_rounds():
-        for r in history:
-            b = r.before
-            due = [
-                p for p in b.participants
-                if b.miss_counts[p] >= b.miss_threshold
-                and p not in b.last_round_players
-                and p not in s.excluded
-                and p not in s.forced
-            ]
-            free = slots(s.mode) - len(s.forced)
-            if len(due) <= free:
-                assert set(due) <= set(r.selected), (s, due, r.reasons)
 
 
 def test_a_participant_with_the_same_name_as_an_organizer_is_an_ordinary_participant():

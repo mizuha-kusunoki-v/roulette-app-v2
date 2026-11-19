@@ -32,7 +32,7 @@ export const MatchInfo = ({ session }: { session: SessionState }) => {
       <h3>前回参加者</h3>
       <p>{names(session.previous_round_players)}</p>
 
-      <h3>次回の優先対象（{session.settings.miss_threshold}回連続未選出）</h3>
+      <h3>次回の優先対象（一番長く連続で外れている人。このうち 1 人は必ず選ばれる）</h3>
       <p>{names(due)}</p>
 
       <h3>自動強制対象（参加回数の中央値差）</h3>
