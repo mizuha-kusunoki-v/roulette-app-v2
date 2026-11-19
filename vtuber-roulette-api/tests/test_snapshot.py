@@ -9,10 +9,10 @@ import random
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+import draw_config
 from roulette import logic
 from roulette.logic import DOUBLE_MODES, SINGLE_MODES
 from roulette.models import DrawMode
-from roulette.snapshot import build_session_state
 from tests import harness
 from tests.builders import SessionBuilder, players
 from tests.simulation import draw, setup_session
@@ -48,7 +48,7 @@ def draw_succeeds(mode: DrawMode) -> bool:
 def test_available_draw_options_match_what_the_draw_api_accepts():
     for seed in range(300):
         random_setup(random.Random(seed))
-        session = build_session_state(harness.session())
+        session = harness.state()
 
         listed = {o.mode for o in session.draw_options}
         assert listed == set(DOUBLE_MODES if session.organizer_mode == "double" else SINGLE_MODES)
@@ -64,7 +64,12 @@ def test_no_draw_is_available_while_the_presentation_runs():
     draw("standard_4")
     assert harness.phase() == "spinning"
 
-    assert all(not o.available for o in build_session_state(harness.session()).draw_options)
+    assert all(not o.available for o in harness.state().draw_options)
+
+
+def test_state_carries_the_presentation_duration_from_the_config():
+    # 演出の長さはバックエンドの設定 (draw_config) だけで決め、状態に載せて画面に渡す
+    assert harness.state().presentation_duration_ms == draw_config.PRESENTATION_DURATION_MS
 
 
 def test_due_matches_who_the_miss_guarantee_would_pick():
@@ -78,7 +83,7 @@ def test_due_matches_who_the_miss_guarantee_would_pick():
         .build()
     )
 
-    due = {p.name for p in build_session_state(harness.session()).participants if p.due}
+    due = {p.name for p in harness.state().participants if p.due}
 
     assert due == {"P00", "P03"}  # P01 は除外中、P02 は規定未満
 
@@ -86,7 +91,7 @@ def test_due_matches_who_the_miss_guarantee_would_pick():
 def test_forced_is_reported_per_participant():
     setup_session(4, forced=["P00", "P01", "P02"], forced_teams={"P00": "none", "P01": "A", "P02": "B"})
 
-    forced = {p.name: p.forced for p in build_session_state(harness.session()).participants}
+    forced = {p.name: p.forced for p in harness.state().participants}
 
     assert forced == {"P00": "any", "P01": "A", "P02": "B", "P03": None}
 
@@ -95,7 +100,7 @@ def test_current_round_groups_players_by_selection_reason():
     setup_session(8, forced=["P05"])
     draw("standard_4")
 
-    current = build_session_state(harness.session()).current_round
+    current = harness.state().current_round
 
     assert current.round_id == harness.round_id()
     by_reason = {g.reason: g.players for g in current.selections}
@@ -108,7 +113,7 @@ def test_previous_round_players_are_from_the_round_before_the_latest():
     before_latest = draw("standard_4")
     draw("standard_4")
 
-    assert build_session_state(harness.session()).previous_round_players == before_latest.selected
+    assert harness.state().previous_round_players == before_latest.selected
 
 
 def test_session_is_served_over_http():
@@ -125,9 +130,9 @@ def test_auto_forced_is_computed_from_the_current_state():
         SessionBuilder().participants(10).settings(auto_force=True).counts(participation={p: 4 for p in players(10) if p != "P00"}).build()
     )
 
-    assert [p.name for p in build_session_state(harness.session()).participants if p.auto_forced] == ["P00"]
+    assert [p.name for p in harness.state().participants if p.auto_forced] == ["P00"]
 
     # 保存した値ではなく今の状態から計算するので、設定を変えればすぐ反映される
     logic.set_excluded(harness.session(), "P00", True)
-    assert not any(p.auto_forced for p in build_session_state(harness.session()).participants)
+    assert not any(p.auto_forced for p in harness.state().participants)
 

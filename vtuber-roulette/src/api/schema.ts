@@ -312,6 +312,13 @@ export interface components {
             /** Players */
             players: string[];
         };
+        /** Revision */
+        Revision: {
+            /** Instance Id */
+            instance_id: string;
+            /** Version */
+            version: number;
+        };
         /** RouletteResult */
         RouletteResult: {
             /**
@@ -356,6 +363,9 @@ export interface components {
              * @enum {string}
              */
             phase: "idle" | "spinning" | "result";
+            revision: components["schemas"]["Revision"];
+            /** Presentation Duration Ms */
+            presentation_duration_ms: number;
             /**
              * Organizer Mode
              * @enum {string}

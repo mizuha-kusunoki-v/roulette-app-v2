@@ -686,6 +686,24 @@
         ],
         "title": "ResultTeam"
       },
+      "Revision": {
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "title": "Instance Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instance_id",
+          "version"
+        ],
+        "title": "Revision"
+      },
       "RouletteResult": {
         "properties": {
           "kind": {
@@ -795,6 +813,13 @@
             ],
             "title": "Phase"
           },
+          "revision": {
+            "$ref": "#/components/schemas/Revision"
+          },
+          "presentation_duration_ms": {
+            "type": "integer",
+            "title": "Presentation Duration Ms"
+          },
           "organizer_mode": {
             "type": "string",
             "enum": [
@@ -855,6 +880,8 @@
         "type": "object",
         "required": [
           "phase",
+          "revision",
+          "presentation_duration_ms",
           "organizer_mode",
           "organizers",
           "participants",

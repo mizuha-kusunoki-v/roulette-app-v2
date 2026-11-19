@@ -13,12 +13,13 @@ from dataclasses import dataclass
 from typing import Dict, Iterator, List
 
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from main import create_app
 from roulette import logic, router
 from roulette.logic import count_history
 from roulette.models import RouletteState
-from roulette.protocol import PresentationCompleteRequest
+from roulette.protocol import PresentationCompleteRequest, SessionState
 
 _app: FastAPI = create_app()
 
@@ -63,6 +64,11 @@ def miss_threshold() -> int:
 
 def phase() -> str:
     return logic.phase(session())
+
+
+def state() -> SessionState:
+    """画面に送る今の状態 (GET /session と同じ組み立て)。"""
+    return SessionState.model_validate(TestClient(_app).get("/session").json())
 
 
 def round_id() -> str | None:

@@ -37,6 +37,7 @@ from .protocol import (
     ParticipantRequest,
     PresentationCompleteRequest,
     ReplaceParticipantsRequest,
+    Revision,
     SaveOrganizersRequest,
     SaveSettingsRequest,
     SessionState,
@@ -178,16 +179,27 @@ def reset(request: Request):
     return {"ok": True}
 
 
+def build_state(conn: HTTPConnection) -> SessionState:
+    """今の状態にその新しさの印 (Revision) を付けて返す。GET /session と /ws/session が同じ組み立てを使う。
+
+    印は状態を読む前に取る。読んでいる間に書き込みがあっても、状態は印より新しいことはあっても古くはならない。
+    書き込みの後の通知で version が進み、そのとき改めて送るので、画面は最後には最新の状態を採用する。
+    """
+    changes: StateChanges = conn.app.state.changes
+    revision = Revision(instance_id=changes.instance_id, version=changes.version)
+    return build_session_state(current_session(conn), revision)
+
+
 async def _push(ws: WebSocket, build: Callable[[], BaseModel], changes: StateChanges) -> None:
-    """接続直後に build() の結果を送り、その後は内容が変わったときだけ送る。"""
-    last_sent = None
+    """接続直後に build() の結果を送り、その後は書き込みの通知のたびに送る。
+
+    内容が前回と同じでも送る。書き込みの途中に読んだ状態は、新しい内容に古い version が付くことがある。
+    そのあと version が進んだ状態を送り直さないと、同じ version の古い状態を先に採用した画面が、新しい内容に追いつけない。
+    """
     while True:
         # 状態を読む前に version を取っておく。読んだ後の変更は wait_after がすぐ返すので取りこぼさない
         version = changes.version
-        payload = build().model_dump(mode="json")
-        if payload != last_sent:
-            await ws.send_json(payload)
-            last_sent = payload
+        await ws.send_json(build().model_dump(mode="json"))
         await changes.wait_after(version)
 
 
@@ -215,11 +227,11 @@ async def _serve(ws: WebSocket, build: Callable[[], BaseModel], changes: StateCh
 
 
 @router.get("/session")
-def get_session(session: RouletteState = Session) -> SessionState:
-    return build_session_state(session)
+def get_session(request: Request) -> SessionState:
+    return build_state(request)
 
 
 @router.websocket("/ws/session")
 async def session_websocket(ws: WebSocket):
     # リセットでセッションが差し替わるので、送るたびにアプリから取り出す
-    await _serve(ws, lambda: build_session_state(current_session(ws)), ws.app.state.changes)
+    await _serve(ws, lambda: build_state(ws), ws.app.state.changes)

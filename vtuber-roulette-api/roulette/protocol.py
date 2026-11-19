@@ -78,8 +78,18 @@ class CurrentRound(BaseModel):
     selections: List[SelectionGroup]
 
 
+class Revision(BaseModel):
+    # 状態の新しさを比べるための印。画面は同じ instance_id の中で version が大きいものだけを採用し、古い状態は捨てる。
+    # version は書き込み系の API が 1 回終わるたびに増える (サーバーを起動し直すと 0 から数え直すので、
+    # 起動のたびに変わる instance_id と組にする。instance_id が変わったら、画面は version を比べず新しい状態を採用する)
+    instance_id: str
+    version: int
+
+
 class SessionState(BaseModel):
     phase: Phase
+    revision: Revision
+    presentation_duration_ms: int  # 抽選演出の長さ。ビュワーの演出と、管理画面の一時的な操作ロックがこの長さを使う
     organizer_mode: OrganizerMode
     organizers: List[Organizer]
     participants: List[ParticipantStatus]

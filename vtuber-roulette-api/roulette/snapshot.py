@@ -6,6 +6,7 @@ logic の関数を呼び、ここでは計算しない。
 
 from typing import Dict, List
 
+from draw_config import PRESENTATION_DURATION_MS
 from .logic import (
     auto_forced_players,
     draw_blocker,
@@ -27,6 +28,7 @@ from .protocol import (
     Organizer,
     ParticipantStatus,
     ResultTeam,
+    Revision,
     RouletteResult,
     SelectionGroup,
     SessionState,
@@ -111,9 +113,11 @@ def _settings(session: RouletteState) -> Settings:
     )
 
 
-def build_session_state(session: RouletteState) -> SessionState:
+def build_session_state(session: RouletteState, revision: Revision) -> SessionState:
     return SessionState(
         phase=phase(session),
+        revision=revision,
+        presentation_duration_ms=PRESENTATION_DURATION_MS,
         organizer_mode=session.organizer_mode,
         organizers=_organizers(session),
         participants=_participants(session),
