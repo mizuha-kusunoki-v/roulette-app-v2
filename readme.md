@@ -164,3 +164,23 @@ AUTO_FORCE_MAX_PER_DRAW = 2
 | DELETE | `/history/{round_id}` | 指定した抽選履歴を削除 |
 | POST | `/reset` | 全状態をリセット |
 | WS | `/ws` | WebSocket リアルタイム同期 |
+| GET | `/session` | セッションの状態（プロトコル）を取得 |
+| WS | `/ws/session` | セッションの状態を、接続時と変化時に送る |
+
+---
+
+## フロントとのプロトコル
+
+バックエンドは内部の状態をそのまま送らず、`vtuber-roulette-api/roulette/protocol.py` で決めた形（`SessionState`）にして送ります。
+抽選できるか・優先対象かといった、抽選のルールから導く値もバックエンドが計算して送ります。フロントでは計算し直しません。
+
+API の形は `vtuber-roulette-api/openapi.json` に書き出してコミットし、フロントの型（`vtuber-roulette/src/api/schema.ts`）はそこから生成します。
+API やプロトコルのモデルを変えたときは、両方を更新してコミットしてください。
+
+```bash
+cd vtuber-roulette-api
+uv run python export_openapi.py   # openapi.json を書き出す（古いままだと uv run pytest が失敗する）
+
+cd ../vtuber-roulette
+npm run gen:api                   # schema.ts を生成する（npm run build でも実行される）
+```
