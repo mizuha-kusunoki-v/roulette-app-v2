@@ -5,22 +5,6 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/state": {
-      "get": {
-        "summary": "Get State",
-        "operationId": "get_state_state_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
     "/participants": {
       "post": {
         "summary": "Set Participants",
@@ -356,31 +340,19 @@
           "result": {
             "$ref": "#/components/schemas/RouletteResult"
           },
-          "reasons": {
-            "additionalProperties": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/SelectionGroup"
             },
-            "propertyNames": {
-              "enum": [
-                "manual_check",
-                "miss_3",
-                "median_gap",
-                "random",
-                "exception_prev_round"
-              ]
-            },
-            "type": "object",
-            "title": "Reasons"
+            "type": "array",
+            "title": "Selections"
           }
         },
         "type": "object",
         "required": [
           "round_id",
           "result",
-          "reasons"
+          "selections"
         ],
         "title": "CurrentRound"
       },
@@ -748,6 +720,34 @@
           "teams"
         ],
         "title": "RouletteResult"
+      },
+      "SelectionGroup": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "manual_check",
+              "miss_3",
+              "median_gap",
+              "random",
+              "exception_prev_round"
+            ],
+            "title": "Reason"
+          },
+          "players": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Players"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "players"
+        ],
+        "title": "SelectionGroup"
       },
       "SessionState": {
         "properties": {

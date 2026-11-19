@@ -153,7 +153,6 @@ AUTO_FORCE_MAX_PER_DRAW = 2
 
 | メソッド | パス | 内容 |
 |---|---|---|
-| GET | `/state` | 現在の状態を取得 |
 | POST | `/participants` | 参加者リストを更新 |
 | POST | `/organizer_config` | 主催設定を更新 |
 | POST | `/forced_players` | 手動強制プレイヤーを設定 |
@@ -163,7 +162,6 @@ AUTO_FORCE_MAX_PER_DRAW = 2
 | POST | `/presentation_complete` | スロット演出完了を通知 |
 | DELETE | `/history/{round_id}` | 指定した抽選履歴を削除 |
 | POST | `/reset` | 全状態をリセット |
-| WS | `/ws` | WebSocket リアルタイム同期 |
 | GET | `/session` | セッションの状態（プロトコル）を取得 |
 | WS | `/ws/session` | セッションの状態を、接続時と変化時に送る |
 

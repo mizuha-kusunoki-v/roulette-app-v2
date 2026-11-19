@@ -1,44 +1,26 @@
-import { RouletteResult, RouletteResultTeam } from "../types";
+import { Organizer, RouletteResult, RouletteResultTeam } from "../types";
 
-export function getActiveOrganizers(
-  organizerMode: "single" | "double",
-  organizers: string[],
-  selectedOrganizerIndices: number[] = [0],
-): string[] {
-  const limit = organizerMode === "double" ? 2 : 1;
-  return selectedOrganizerIndices
-    .filter((i) => i >= 0 && i < organizers.length)
-    .slice(0, limit)
-    .map((i) => organizers[i]);
+export function activeOrganizerNames(organizers: Organizer[]): string[] {
+  return organizers.filter((o) => o.active).map((o) => o.name);
 }
 
+/**
+ * 表示用のチーム分け。
+ * 3人抽選を主催なしで引いた後に主催が設定された場合は、チームAの先頭に今の主催を加えて見せる。
+ */
 export function getDisplayTeams(
   result: RouletteResult | null,
-  organizers: string[] = [],
-  organizerMode: "single" | "double" = "single",
-  selectedOrganizerIndices: number[] = [0],
+  organizers: Organizer[],
 ): RouletteResultTeam[] {
   if (!result) {
     return [];
   }
 
-  const activeOrganizers = getActiveOrganizers(
-    organizerMode,
-    organizers,
-    selectedOrganizerIndices,
-  );
+  const [host] = activeOrganizerNames(organizers);
 
-  if (
-    result.kind === "standard_3" &&
-    activeOrganizers[0] &&
-    result.teams[0] &&
-    result.teams[0].players.length === 1
-  ) {
+  if (result.kind === "standard_3" && host && result.teams[0] && result.teams[0].players.length === 1) {
     return [
-      {
-        ...result.teams[0],
-        players: [activeOrganizers[0], result.teams[0].players[0]],
-      },
+      { ...result.teams[0], players: [host, result.teams[0].players[0]] },
       ...result.teams.slice(1),
     ];
   }

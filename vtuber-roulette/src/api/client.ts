@@ -1,4 +1,4 @@
-import { DrawMode, OrganizerMode, RouletteState } from "../types";
+import { DrawMode, OrganizerMode, SessionState } from "../types";
 import { apiUrl } from "./endpoint";
 
 
@@ -15,8 +15,8 @@ async function ensureOk(res: Response) {
   throw new Error(message);
 }
 
-export async function fetchState(): Promise<RouletteState> {
-  const res = await fetch(apiUrl("/state"));
+export async function fetchSession(): Promise<SessionState> {
+  const res = await fetch(apiUrl("/session"));
   await ensureOk(res);
   return res.json();
 }
@@ -75,9 +75,6 @@ export async function draw(mode: DrawMode) {
     body: JSON.stringify({ mode }),
   });
   await ensureOk(res);
-
-  const data = await res.json();
-  return data.result;
 }
 
 export async function updateDrawSettings(missThreshold: number, enableAutoForce: boolean) {

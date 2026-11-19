@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { notifyPresentationComplete } from "../api/client";
 import { wsUrl } from "../api/endpoint";
-import { RouletteState } from "../types";
+import { SessionState } from "../types";
 import { getDisplayTeams } from "../utils/resultDisplay";
 import "./roulette.css";
 
 const ANIMATION_DURATION_MS = 5000;
 
 export const ResultViewerPage = () => {
-  const [serverState, setServerState] = useState<RouletteState | null>(null);
+  const [serverState, setServerState] = useState<SessionState | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [animating, setAnimating] = useState(false);
 
@@ -17,9 +17,9 @@ export const ResultViewerPage = () => {
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket(wsUrl("/ws"));
+    const ws = new WebSocket(wsUrl("/ws/session"));
     ws.onmessage = (e) => {
-      const incoming = JSON.parse(e.data) as RouletteState;
+      const incoming = JSON.parse(e.data) as SessionState;
       setServerState(incoming);
     };
     return () => ws.close();
@@ -32,13 +32,14 @@ export const ResultViewerPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!serverState?.round_id || !serverState.result) return;
+    const round = serverState?.current_round;
+    if (!serverState || !round) return;
     if (serverState.phase !== "spinning") return;
-    if (serverState.round_id === lastRoundIdRef.current) return;
+    if (round.round_id === lastRoundIdRef.current) return;
 
-    lastRoundIdRef.current = serverState.round_id;
-    const roundId = serverState.round_id;
-    const candidates = [...serverState.participants];
+    lastRoundIdRef.current = round.round_id;
+    const roundId = round.round_id;
+    const candidates = serverState.participants.map((p) => p.name);
 
     if (intervalRef.current !== null) clearInterval(intervalRef.current);
 
@@ -80,7 +81,7 @@ export const ResultViewerPage = () => {
     );
   }
 
-  if (!serverState.result) {
+  if (!serverState.current_round) {
     return (
       <div className="viewer-screen viewer-center">
         <div className="status-panel">抽選結果待機中</div>
@@ -88,12 +89,7 @@ export const ResultViewerPage = () => {
     );
   }
 
-  const teams = getDisplayTeams(
-    serverState.result,
-    serverState.organizers,
-    serverState.organizer_mode,
-    serverState.selected_organizer_indices,
-  );
+  const teams = getDisplayTeams(serverState.current_round.result, serverState.organizers);
 
   return (
     <div className="viewer-screen viewer-center">

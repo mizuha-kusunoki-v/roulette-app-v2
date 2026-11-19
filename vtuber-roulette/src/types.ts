@@ -1,50 +1,18 @@
-export type OrganizerMode = "single" | "double";
+// バックエンドとのプロトコルの型。手で書かず、OpenAPI から生成した schema.ts に名前を付けるだけにする。
+// 型を変えたいときは、バックエンドのモデルを変えて `npm run gen:api` で生成し直す。
+import type { components } from "./api/schema";
 
-export type DrawMode =
-  | "standard_3"
-  | "standard_4"
-  | "hosts_vs_duo"
-  | "hosts_split_pairs";
+type Schemas = components["schemas"];
 
-export type RouletteResultTeam = {
-  label: string;
-  players: string[];
-};
-
-export type RouletteResult = {
-  kind: DrawMode;
-  teams: RouletteResultTeam[];
-};
-
-export type DrawRecord = {
-  round_id: string;
-  drawn_at: string;
-  result: RouletteResult;
-  selected: string[];
-  organizers: string[];
-  participants: string[];
-  reasons: Record<string, string>;
-};
-
-export type RouletteState = {
-  participants: string[];
-  organizer_mode: OrganizerMode;
-  organizers: string[];
-  selected_organizer_indices: number[];
-  forced_players: string[];
-  forced_player_teams: Record<string, "none" | "A" | "B">;
-  auto_forced_players: string[];
-  excluded_players: string[];
-  participation_counts: Record<string, number>;
-  prev_players: string[];
-  last_players: string[];
-  spin_order: string[];
-  miss_counts: Record<string, number>;
-  last_selection_reasons: Record<string, string>;
-  result: RouletteResult | null;
-  round_id: string | null;
-  phase: "idle" | "spinning" | "result";
-  miss_threshold: number;
-  enable_auto_force: boolean;
-  history: DrawRecord[];
-};
+export type SessionState = Schemas["SessionState"];
+export type ParticipantStatus = Schemas["ParticipantStatus"];
+export type Organizer = Schemas["Organizer"];
+export type DrawOption = Schemas["DrawOption"];
+export type DrawRecord = Schemas["DrawRecord"];
+export type RouletteResult = Schemas["RouletteResult"];
+export type RouletteResultTeam = Schemas["ResultTeam"];
+export type SelectionGroup = Schemas["SelectionGroup"];
+export type SelectionReason = SelectionGroup["reason"];
+export type DrawMode = Schemas["DrawRequest"]["mode"];
+export type OrganizerMode = SessionState["organizer_mode"];
+export type ForcedTeam = NonNullable<ParticipantStatus["forced"]>;

@@ -36,11 +36,6 @@ _PAIR_RETRY_MAX = 10
 router = APIRouter()
 
 
-@router.get("/state")
-def get_state():
-    return state
-
-
 def _clean_forced_player_teams() -> None:
     """forced_players に含まれないプレイヤーの team 情報を削除する。"""
     state.forced_player_teams = {
@@ -210,12 +205,6 @@ async def _serve(ws: WebSocket, build: Callable[[], BaseModel]) -> None:
         error = task.exception()
         if error is not None and not isinstance(error, WebSocketDisconnect):
             raise error
-
-
-@router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    # 旧形式 (内部状態をそのまま送る)。フロントをビューに切り替えたら消す
-    await _serve(ws, lambda: state)
 
 
 # ── プロトコル (サーバーから送る状態) ─────────────────────────────────────────

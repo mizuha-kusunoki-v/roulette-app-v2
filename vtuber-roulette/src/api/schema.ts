@@ -4,23 +4,6 @@
  */
 
 export interface paths {
-    "/state": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get State */
-        get: operations["get_state_state_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/participants": {
         parameters: {
             query?: never;
@@ -200,10 +183,8 @@ export interface components {
             /** Round Id */
             round_id: string;
             result: components["schemas"]["RouletteResult"];
-            /** Reasons */
-            reasons: {
-                [key: string]: string[];
-            };
+            /** Selections */
+            selections: components["schemas"]["SelectionGroup"][];
         };
         /** DrawOption */
         DrawOption: {
@@ -343,6 +324,16 @@ export interface components {
             /** Teams */
             teams: components["schemas"]["ResultTeam"][];
         };
+        /** SelectionGroup */
+        SelectionGroup: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "manual_check" | "miss_3" | "median_gap" | "random" | "exception_prev_round";
+            /** Players */
+            players: string[];
+        };
         /** SessionState */
         SessionState: {
             /**
@@ -399,26 +390,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    get_state_state_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
     set_participants_participants_post: {
         parameters: {
             query?: never;

@@ -1,15 +1,12 @@
 import { ChangeEvent, useRef, useState } from "react";
 import { updateExcludedPlayers, updateForcedPlayers, updateParticipants } from "../api/client";
-import { OrganizerMode } from "../types";
+import { ParticipantStatus } from "../types";
+
+type RequestTeam = "none" | "A" | "B";
 
 interface Props {
-  participants: string[];
-  forcedPlayers: string[];
-  forcedPlayerTeams: Record<string, "none" | "A" | "B">;
-  autoForcedPlayers: string[];
-  excludedPlayers: string[];
-  participationCounts: Record<string, number>;
-  organizerMode: OrganizerMode;
+  participants: ParticipantStatus[];
+  forcedLimit: number;
   onUpdated: () => void;
 }
 
@@ -32,20 +29,17 @@ function parseCsvLines(text: string): string[] {
   return names;
 }
 
-export const ParticipantManager = ({
-  participants,
-  forcedPlayers,
-  forcedPlayerTeams,
-  autoForcedPlayers,
-  excludedPlayers,
-  participationCounts,
-  organizerMode,
-  onUpdated,
-}: Props) => {
+export const ParticipantManager = ({ participants: statuses, forcedLimit, onUpdated }: Props) => {
   const [name, setName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const forcedLimit = organizerMode === "double" ? 2 : 4;
+  // 書き込み API はまだリスト全体を受け取る形なので、送るリストを参加者ごとの状態から組み立てる
+  const participants = statuses.map((p) => p.name);
+  const forcedPlayers = statuses.filter((p) => p.forced !== null).map((p) => p.name);
+  const forcedPlayerTeams: Record<string, RequestTeam> = Object.fromEntries(
+    statuses.flatMap((p) => (p.forced === null ? [] : [[p.name, p.forced === "any" ? "none" : p.forced]])),
+  );
+  const excludedPlayers = statuses.filter((p) => p.excluded).map((p) => p.name);
 
   const add = async () => {
     const trimmed = name.trim();
@@ -77,7 +71,7 @@ export const ParticipantManager = ({
     onUpdated();
   };
 
-  const setForcedTeam = async (target: string, team: "none" | "A" | "B") => {
+  const setForcedTeam = async (target: string, team: RequestTeam) => {
     const newTeams = { ...forcedPlayerTeams, [target]: team };
     await updateForcedPlayers(forcedPlayers, newTeams);
     onUpdated();
@@ -150,10 +144,11 @@ export const ParticipantManager = ({
       </div>
 
       <ul>
-        {participants.map((player) => {
-          const checkedForced = forcedPlayers.includes(player);
+        {statuses.map((status) => {
+          const player = status.name;
+          const checkedForced = status.forced !== null;
           const disabledForced = !checkedForced && forcedPlayers.length >= forcedLimit;
-          const checkedExcluded = excludedPlayers.includes(player);
+          const checkedExcluded = status.excluded;
           const currentTeam = forcedPlayerTeams[player] ?? "none";
 
           return (
@@ -168,7 +163,7 @@ export const ParticipantManager = ({
               {checkedForced && (
                 <select
                   value={currentTeam}
-                  onChange={(e) => setForcedTeam(player, e.target.value as "none" | "A" | "B")}
+                  onChange={(e) => setForcedTeam(player, e.target.value as RequestTeam)}
                   style={{ marginLeft: 4 }}
                 >
                   <option value="none">チーム指定なし</option>
@@ -184,8 +179,8 @@ export const ParticipantManager = ({
               />{" "}
               除外
               {" "}
-              {player} (参加回数: {participationCounts[player] ?? 0}){" "}
-              {autoForcedPlayers.includes(player) && <span>[自動強制対象]</span>}{" "}
+              {player} (参加回数: {status.participation_count}){" "}
+              {status.auto_forced && <span>[自動強制対象]</span>}{" "}
               {checkedForced && <span>[手動強制{currentTeam !== "none" ? `・チーム${currentTeam}固定` : ""}]</span>}{" "}
               {checkedExcluded && <span>[除外中]</span>}{" "}
               <button onClick={() => remove(player)}>削除</button>

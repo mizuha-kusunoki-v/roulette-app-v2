@@ -1,24 +1,19 @@
 import { useEffect, useState } from "react";
 import { updateDrawSettings } from "../api/client";
+import { SessionState } from "../types";
 
 interface Props {
-  missThreshold: number;
-  enableAutoForce: boolean;
+  settings: SessionState["settings"];
   disabled: boolean;
   onUpdated: () => void;
 }
 
-export const DrawSettings = ({
-  missThreshold,
-  enableAutoForce,
-  disabled,
-  onUpdated,
-}: Props) => {
-  const [threshold, setThreshold] = useState(missThreshold);
-  const [autoForce, setAutoForce] = useState(enableAutoForce);
+export const DrawSettings = ({ settings, disabled, onUpdated }: Props) => {
+  const [threshold, setThreshold] = useState(settings.miss_threshold);
+  const [autoForce, setAutoForce] = useState(settings.enable_auto_force);
 
-  useEffect(() => { setThreshold(missThreshold); }, [missThreshold]);
-  useEffect(() => { setAutoForce(enableAutoForce); }, [enableAutoForce]);
+  useEffect(() => { setThreshold(settings.miss_threshold); }, [settings.miss_threshold]);
+  useEffect(() => { setAutoForce(settings.enable_auto_force); }, [settings.enable_auto_force]);
 
   const save = async () => {
     await updateDrawSettings(threshold, autoForce);

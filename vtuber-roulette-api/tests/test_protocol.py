@@ -95,8 +95,9 @@ def test_current_round_groups_players_by_selection_reason():
     current = session_state().current_round
 
     assert current.round_id == state.round_id
-    assert current.reasons["manual_check"] == ["P05"]
-    assert sorted(sum(current.reasons.values(), [])) == sorted(state.last_players)
+    by_reason = {g.reason: g.players for g in current.selections}
+    assert by_reason["manual_check"] == ["P05"]
+    assert sorted(sum(by_reason.values(), [])) == sorted(state.last_players)
 
 
 def test_previous_round_players_are_from_the_round_before_the_latest():

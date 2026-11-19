@@ -53,10 +53,16 @@ class DrawOption(BaseModel):
     unavailable_reason: str | None
 
 
+class SelectionGroup(BaseModel):
+    reason: SelectionReason
+    players: List[str]
+
+
 class CurrentRound(BaseModel):
     round_id: str
     result: RouletteResult
-    reasons: Dict[SelectionReason, List[str]]  # 選ばれた理由ごとの参加者
+    # 選ばれた理由ごとの参加者。Dict にしないのは、OpenAPI から生成した型で理由が列挙型として残るようにするため
+    selections: List[SelectionGroup]
 
 
 class SessionState(BaseModel):
@@ -99,10 +105,11 @@ def _draw_option(mode: DrawMode) -> DrawOption:
 def _current_round() -> CurrentRound | None:
     if state.round_id is None or state.result is None:
         return None
-    reasons: Dict[SelectionReason, List[str]] = {}
+    grouped: Dict[str, List[str]] = {}
     for name, reason in state.last_selection_reasons.items():
-        reasons.setdefault(reason, []).append(name)  # type: ignore[arg-type]
-    return CurrentRound(round_id=state.round_id, result=state.result, reasons=reasons)
+        grouped.setdefault(reason, []).append(name)
+    selections = [SelectionGroup(reason=r, players=names) for r, names in grouped.items()]  # type: ignore[arg-type]
+    return CurrentRound(round_id=state.round_id, result=state.result, selections=selections)
 
 
 def session_state() -> SessionState:
