@@ -67,12 +67,12 @@ def get_team_slots(mode: DrawMode) -> tuple[int, int]:
 
 def compute_auto_forced_players(
     manual_forced: List[str],
-    excluded_players: List[str] | None = None,
+    already_selected: List[str] | None = None,
 ) -> List[str]:
     if not state.enable_auto_force or not state.participants:
         return []
 
-    excluded_set = set(excluded_players or [])
+    skip = set(already_selected or []) | set(state.excluded_players)
     organizers = organizer_set()
     participant_counts = [
         state.participation_counts.get(p, 0)
@@ -91,7 +91,7 @@ def compute_auto_forced_players(
         if p not in organizers
         and p not in manual_forced
         and p not in state.last_players
-        and p not in excluded_set
+        and p not in skip
         and state.miss_counts.get(p, 0) < state.miss_threshold
         and state.participation_counts.get(p, 0) <= threshold
     ]
@@ -196,7 +196,10 @@ def select_players(mode: DrawMode):
         and p not in state.excluded_players
     ]
 
+    # 保証対象が枠より多いときは、長く待っている人から。同じ回数どうしは参加者リストの順で決めない
     guaranteed = [p for p in non_prev_pool if state.miss_counts.get(p, 0) >= state.miss_threshold]
+    random.shuffle(guaranteed)
+    guaranteed.sort(key=lambda p: state.miss_counts.get(p, 0), reverse=True)
     fill_slots(guaranteed, "miss_3")
 
     auto_forced = compute_auto_forced_players(all_manual_forced, list(selected_set))
