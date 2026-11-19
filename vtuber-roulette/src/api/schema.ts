@@ -244,6 +244,11 @@ export interface components {
              */
             mode: "standard_3" | "standard_4" | "hosts_vs_duo" | "hosts_split_pairs";
         };
+        /** DrawResponse */
+        DrawResponse: {
+            /** Round Id */
+            round_id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -652,7 +657,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DrawResponse"];
                 };
             };
             /** @description Validation Error */

@@ -132,3 +132,7 @@ class SaveSettingsRequest(BaseModel):
 
 class DrawRequest(BaseModel):
     mode: DrawMode
+
+
+class DrawResponse(BaseModel):
+    round_id: str  # 抽選した回の ID。結果そのものは /session と /ws/session で届く

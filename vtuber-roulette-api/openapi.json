@@ -276,7 +276,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DrawResponse"
+                }
               }
             }
           },
@@ -500,6 +502,19 @@
           "mode"
         ],
         "title": "DrawRequest"
+      },
+      "DrawResponse": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "title": "Round Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id"
+        ],
+        "title": "DrawResponse"
       },
       "HTTPValidationError": {
         "properties": {

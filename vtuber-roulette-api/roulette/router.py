@@ -18,7 +18,6 @@ from .logic import (
     delete_history_record,
     draw_blocker,
     find_participant,
-    latest_round,
     matchup_key,
     new_round,
     remove_participant,
@@ -32,6 +31,7 @@ from .models import RouletteState
 from .messages import describe_draw_block, forced_limit_exceeded
 from .protocol import (
     DrawRequest,
+    DrawResponse,
     ParticipantRequest,
     ReplaceParticipantsRequest,
     Revision,
@@ -124,7 +124,7 @@ def put_settings(req: SaveSettingsRequest, session: RouletteState = Session):
 
 
 @router.post("/draw")
-def draw(req: DrawRequest, session: RouletteState = Session):
+def draw(req: DrawRequest, session: RouletteState = Session) -> DrawResponse:
     block = draw_blocker(session, req.mode)
     if block is not None:
         raise HTTPException(status_code=400, detail=describe_draw_block(block))
@@ -136,21 +136,18 @@ def draw(req: DrawRequest, session: RouletteState = Session):
         # 同じ組み合わせが出るたびに確率 1/(count+1) で採用、最終試行は強制採用
         if count == 0 or attempt == _PAIR_RETRY_MAX or random.random() < 1 / (count + 1):
             break
-    apply_draw_result(
+    new = new_round(
         session,
-        new_round(
-            session,
-            round_id=str(uuid.uuid4()),
-            drawn_at=datetime.now(timezone.utc).isoformat(),
-            mode=req.mode,
-            selection=selection,
-            organizers=organizers,
-        )
+        round_id=str(uuid.uuid4()),
+        drawn_at=datetime.now(timezone.utc).isoformat(),
+        mode=req.mode,
+        selection=selection,
+        organizers=organizers,
     )
+    apply_draw_result(session, new)
 
     # 結果は /session と /ws/session で届くので、ここでは回の ID だけを返す (内部のモデルを外に出さない)
-    latest = latest_round(session)
-    return {"round_id": latest.round_id if latest else None}
+    return DrawResponse(round_id=new.round_id)
 
 
 @router.delete("/history/{round_id}")

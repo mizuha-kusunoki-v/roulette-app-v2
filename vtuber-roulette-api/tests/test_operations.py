@@ -120,6 +120,15 @@ def test_settings_are_saved_and_validated(client):
     assert client.put("/settings", json={"miss_threshold": 0, "enable_auto_force": True}).status_code == 400
 
 
+def test_draw_returns_the_id_of_the_round_it_drew(client):
+    client.put("/participants", json={"names": ["A", "B", "C", "D", "E"]})
+
+    res = client.post("/draw", json={"mode": "standard_4"})
+
+    assert res.status_code == 200
+    assert res.json() == {"round_id": session(client)["current_round"]["round_id"]}
+
+
 def test_reset_returns_to_the_initial_state(client):
     client.put("/participants", json={"names": ["A", "B", "C", "D"]})
     client.put("/settings", json={"miss_threshold": 5, "enable_auto_force": True})
